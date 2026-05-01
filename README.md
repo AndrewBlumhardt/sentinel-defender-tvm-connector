@@ -144,6 +144,46 @@ DCR_NAME=dcr-DeviceTvmSnapshot
 LOGICAPP_NAME=DeviceTvmSnapshotConnector
 ```
 
+If you need help finding these IDs, use the commands below.
+
+### 1a. Find Required IDs (Workspace Resource ID and DCE External ID)
+
+Find workspace resource ID:
+
+```bash
+# Option 1: if you know workspace resource group + workspace name
+WORKSPACE_RG=<workspace-resource-group>
+WORKSPACE_NAME=<workspace-name>
+
+WORKSPACE_RESOURCE_ID=$(az monitor log-analytics workspace show \
+  --resource-group $WORKSPACE_RG \
+  --workspace-name $WORKSPACE_NAME \
+  --query id -o tsv)
+
+echo $WORKSPACE_RESOURCE_ID
+
+# Option 2: list all workspaces in current subscription
+az monitor log-analytics workspace list --query "[].{name:name, rg:resourceGroup, id:id}" -o table
+```
+
+Find DCE external ID (this is the DCE resource ID used by DCR parameter `dataCollectionEndpoints_DeviceTvmSnapshot_externalid`):
+
+```bash
+# If DCE already exists
+DCE_ID=$(az monitor data-collection endpoint show -g $RG -n $DCE_NAME --query id -o tsv)
+echo $DCE_ID
+
+# If you need to browse DCEs first
+az monitor data-collection endpoint list -g $RG --query "[].{name:name, id:id}" -o table
+```
+
+Quick validation:
+
+```bash
+echo "Workspace: $WORKSPACE_RESOURCE_ID"
+echo "DCE ID   : $DCE_ID"
+```
+
 ### 2. Deploy DCE
 
 ```bash
