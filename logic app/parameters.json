@@ -9,16 +9,16 @@
             "value": null
         },
         "advancedHuntingUri": {
-            "value": "https://graph.microsoft.us/v1.0/security/runHuntingQuery"
+            "value": "https://graph.microsoft.com/v1.0/security/runHuntingQuery"
         },
         "advancedHuntingAudience": {
-            "value": "https://graph.microsoft.us"
+            "value": "https://graph.microsoft.com"
         },
         "logsIngestionUri": {
             "value": null
         },
         "logsIngestionAudience": {
-            "value": "https://monitor.azure.us"
+            "value": "https://monitor.azure.com"
         },
         "recurrenceInterval": {
             "value": 1

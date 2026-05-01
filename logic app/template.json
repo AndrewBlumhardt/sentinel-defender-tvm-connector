@@ -11,18 +11,18 @@
             "type": "String"
         },
         "advancedHuntingUri": {
-            "defaultValue": "https://graph.microsoft.us/v1.0/security/runHuntingQuery",
+            "defaultValue": "https://graph.microsoft.com/v1.0/security/runHuntingQuery",
             "type": "String"
         },
         "advancedHuntingAudience": {
-            "defaultValue": "https://graph.microsoft.us",
+            "defaultValue": "https://graph.microsoft.com",
             "type": "String"
         },
         "logsIngestionUri": {
             "type": "String"
         },
         "logsIngestionAudience": {
-            "defaultValue": "https://monitor.azure.us",
+            "defaultValue": "https://monitor.azure.com",
             "type": "String"
         },
         "recurrenceInterval": {

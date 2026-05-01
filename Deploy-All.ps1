@@ -145,6 +145,17 @@ if (-not [string]::IsNullOrWhiteSpace($Subscription)) {
 $account = $accountJson | ConvertFrom-Json
 Write-Host "`nCloud: $cloudLabel | Subscription: $($account.name) ($($account.id))" -ForegroundColor DarkCyan
 
+$enabledSubscriptions = az account list --query "[?state=='Enabled'] | length(@)" -o tsv 2>$null
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($enabledSubscriptions) -or [int]$enabledSubscriptions -lt 1) {
+    $tenantHint = if ($Government) {
+        'No enabled subscriptions found in AzureUSGovernment. Verify tenant/directory access and run: az login --environment AzureUSGovernment'
+    }
+    else {
+        'No enabled subscriptions found in AzureCloud. Verify tenant/directory access and run: az login'
+    }
+    throw $tenantHint
+}
+
 # ---- Resolve location -----------------------------------------------------------
 
 if ([string]::IsNullOrWhiteSpace($Location)) {
