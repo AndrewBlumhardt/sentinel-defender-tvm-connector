@@ -71,6 +71,9 @@ These tables were removed because they accounted for **most of the data volume**
 |-- dcr/
 |   |-- template.json
 |   `-- parameters.json
+|-- table/
+|   |-- template.json
+|   `-- parameters.json
 `-- logic app/
     |-- template.json
     |-- parameters.json
@@ -123,7 +126,7 @@ DCE ARM ID (this is the value for dataCollectionEndpointId / dataCollectionEndpo
 
 ## Deploy with Script (Recommended)
 
-Clone the repo, then run a single PowerShell 7+ script that deploys **DCE -> DCR -> Logic App** in order, wires up the managed identity RBAC, and prints next-step instructions.
+Clone the repo, then run a single PowerShell 7+ script that deploys **Table -> DCE -> DCR -> Logic App** in order, wires up the managed identity RBAC, and prints next-step instructions.
 
 ```powershell
 # Azure Commercial
@@ -143,12 +146,12 @@ Only `-ResourceGroup` and `-WorkspaceResourceId` are typically required. All oth
 
 ## Deploy To Azure (Portal Buttons)
 
-Deploy in this order: DCE -> DCR -> Logic App.
+Deploy in this order: Table -> DCE -> DCR -> Logic App.
 
-| Cloud | DCE | DCR | Logic App |
-| --- | --- | --- | --- |
-| Azure Commercial | <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy DCE to Azure"></a> | <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy DCR to Azure"></a> | <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy Logic App to Azure"></a> |
-| Azure Government | <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy DCE to Azure Government"></a> | <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy DCR to Azure Government"></a> | <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy Logic App to Azure Government"></a> |
+| Cloud | Table | DCE | DCR | Logic App |
+| --- | --- | --- | --- | --- |
+| Azure Commercial | <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Ftable%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy Table to Azure"></a> | <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy DCE to Azure"></a> | <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy DCR to Azure"></a> | <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy Logic App to Azure"></a> |
+| Azure Government | <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Ftable%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy Table to Azure Government"></a> | <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy DCE to Azure Government"></a> | <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy DCR to Azure Government"></a> | <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy Logic App to Azure Government"></a> |
 
 > [!IMPORTANT]
 > If the subscription dropdown is empty in the deploy blade, you are usually signed into the wrong cloud or directory for that button. Use `portal.azure.com` for commercial and `portal.azure.us` for government, then switch to the correct directory/tenant and retry.
@@ -194,6 +197,14 @@ The DCR deployment validates that `DeviceTvmSnapshot_CL` already exists in the t
 If this table does not exist yet, create it before deploying DCR:
 
 ```bash
+# Option A: Deploy ARM template in workspace resource group
+az deployment group create \
+  --resource-group $WORKSPACE_RG \
+  --template-file table/template.json \
+  --parameters @table/parameters.json \
+  --parameters workspaceName=$WORKSPACE_NAME tableName=DeviceTvmSnapshot_CL
+
+# Option B: Create table directly with CLI
 az monitor log-analytics workspace table create \
   --resource-group $WORKSPACE_RG \
   --workspace-name $WORKSPACE_NAME \

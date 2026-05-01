@@ -105,6 +105,7 @@ $defenderAppRole = 'ThreatHunting.Read.All'
 $repoOwner  = 'AndrewBlumhardt'
 $repoName   = 'sentinel-defender-tvm-connector'
 $repoBranch = 'main'
+$tableName  = 'DeviceTvmSnapshot_CL'
 
 # ---- Prompt for required values ------------------------------------------------
 
@@ -178,25 +179,6 @@ if (-not $workspaceMatch.Success) {
 
 $workspaceRg   = $workspaceMatch.Groups[1].Value
 $workspaceName = $workspaceMatch.Groups[2].Value
-$tableName     = 'DeviceTvmSnapshot_CL'
-
-Write-Host "Validating workspace table '$tableName' in workspace '$workspaceName'..." -ForegroundColor DarkCyan
-$tableJson = az monitor log-analytics workspace table show `
-    --resource-group $workspaceRg `
-    --workspace-name $workspaceName `
-    --name $tableName `
-    -o json 2>$null
-
-if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($tableJson)) {
-    throw @"
-Required Log Analytics custom table '$tableName' was not found in workspace '$workspaceName' (resource group '$workspaceRg').
-
-Create it first, then rerun deployment:
-az monitor log-analytics workspace table create --resource-group $workspaceRg --workspace-name $workspaceName --name $tableName --columns TimeGenerated=datetime TableName=string
-
-This prevents DCR deployment error: InvalidOutputTable for stream 'Custom-DeviceTvmSnapshot_CL'.
-"@
-}
 
 $timestamp = Get-Date -Format 'yyyyMMddHHmmss'
 $results   = [System.Collections.Generic.List[pscustomobject]]::new()
@@ -222,7 +204,42 @@ function Invoke-Step {
     }
 }
 
-# ---- 1. Deploy DCE ---------------------------------------------------------------
+# ---- 1. Create/validate custom workspace table ----------------------------------
+
+Write-Host "`n[CHECK] Workspace table '$tableName' in workspace '$workspaceName'..." -ForegroundColor Cyan
+$tableJson = az monitor log-analytics workspace table show `
+    --resource-group $workspaceRg `
+    --workspace-name $workspaceName `
+    --name $tableName `
+    -o json 2>$null
+
+if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($tableJson)) {
+    Write-Host "  Table already exists." -ForegroundColor Green
+    $results.Add([pscustomobject]@{ Step = 'Workspace table (DeviceTvmSnapshot_CL)'; Status = 'Exists' })
+}
+else {
+    $tableTemplateUri = "https://raw.githubusercontent.com/$repoOwner/$repoName/$repoBranch/table/template.json"
+    $ok = Invoke-Step 'Workspace table (DeviceTvmSnapshot_CL)' {
+        az deployment group create `
+            --resource-group $workspaceRg `
+            --name "table-$timestamp" `
+            --template-uri $tableTemplateUri `
+            --parameters workspaceName=$workspaceName tableName=$tableName `
+            --output table
+    }
+    if (-not $ok) { throw 'Workspace table deployment failed. Aborting.' }
+
+    $tableJson = az monitor log-analytics workspace table show `
+        --resource-group $workspaceRg `
+        --workspace-name $workspaceName `
+        --name $tableName `
+        -o json 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($tableJson)) {
+        throw "Workspace table '$tableName' was not found after deployment in workspace '$workspaceName' ($workspaceRg)."
+    }
+}
+
+# ---- 2. Deploy DCE ---------------------------------------------------------------
 
 $dceTemplatUri = "https://raw.githubusercontent.com/$repoOwner/$repoName/$repoBranch/dce/template.json"
 
@@ -249,7 +266,7 @@ if ([string]::IsNullOrWhiteSpace($dceId) -or [string]::IsNullOrWhiteSpace($dceIn
 Write-Host "  DCE resource ID    : $dceId"             -ForegroundColor DarkGray
 Write-Host "  DCE ingest endpoint: $dceIngestEndpoint" -ForegroundColor DarkGray
 
-# ---- 2. Deploy DCR ---------------------------------------------------------------
+# ---- 3. Deploy DCR ---------------------------------------------------------------
 
 $dcrTemplateUri = "https://raw.githubusercontent.com/$repoOwner/$repoName/$repoBranch/dcr/template.json"
 
@@ -279,14 +296,14 @@ if ([string]::IsNullOrWhiteSpace($dcrImmutableId)) {
 Write-Host "  DCR resource ID  : $dcrId"          -ForegroundColor DarkGray
 Write-Host "  DCR immutable ID : $dcrImmutableId" -ForegroundColor DarkGray
 
-# ---- 3. Build ingestion URI ------------------------------------------------------
+# ---- 4. Build ingestion URI ------------------------------------------------------
 
 # Normalize endpoint (ensure trailing /)
 if (-not $dceIngestEndpoint.EndsWith('/')) { $dceIngestEndpoint += '/' }
 $logsIngestionUri = "${dceIngestEndpoint}dataCollectionRules/${dcrImmutableId}/streams/Custom-DeviceTvmSnapshot_CL?api-version=2023-01-01"
 Write-Host "  Logs ingestion URI: $logsIngestionUri" -ForegroundColor DarkGray
 
-# ---- 4. Deploy Logic App ---------------------------------------------------------
+# ---- 5. Deploy Logic App ---------------------------------------------------------
 
 $laTemplateUri = "https://raw.githubusercontent.com/$repoOwner/$repoName/$repoBranch/logic%20app/template.json"
 
@@ -306,7 +323,7 @@ $ok = Invoke-Step 'Logic App' {
 }
 if (-not $ok) { throw 'Logic App deployment failed. Aborting.' }
 
-# ---- 5. Assign Monitoring Metrics Publisher on DCR --------------------------------
+# ---- 6. Assign Monitoring Metrics Publisher on DCR --------------------------------
 
 Write-Host "`n[RBAC] Assigning Monitoring Metrics Publisher on DCR..." -ForegroundColor Cyan
 $laJson        = az logic workflow show -g $ResourceGroup -n $LogicAppName -o json | ConvertFrom-Json
