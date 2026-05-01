@@ -219,6 +219,9 @@ az deployment group create \
 
 `Monitoring Metrics Publisher` on the DCR is required for Logs Ingestion API writes. There is no broader Sentinel role, including Sentinel Contributor, that substitutes for this requirement.
 
+> [!IMPORTANT]
+> `Monitoring Metrics Publisher` on the DCR is mandatory for this connector's ingestion path. No broader Sentinel role is an equivalent substitute.
+
 You can assign this role either with Azure CLI (example below) or manually in the Azure portal on the DCR IAM blade.
 
 ```bash
@@ -239,7 +242,8 @@ This must be assigned with Azure CLI / Microsoft Graph as an app role assignment
 
 The Azure portal UI does not provide a reliable path to assign this app role to managed identities. Use CLI/Graph for this step. No Azure RBAC/Entra role assignment can replace it.
 
-If preferred, this API permission can also be granted to a service principal instead of a managed identity.
+> [!NOTE]
+> This repository defaults to managed identity and secretless auth. If preferred, this API permission can also be granted to a service principal.
 
 Example (Microsoft Graph app role assignment flow):
 
@@ -255,7 +259,8 @@ az rest --method POST \
   --body "{\"principalId\":\"$LA_MI_PRINCIPAL_ID\",\"resourceId\":\"$MDE_RESOURCE_SP_ID\",\"appRoleId\":\"$APP_ROLE_ID\"}"
 ```
 
-Admin consent and directory permissions are required for this step.
+> [!IMPORTANT]
+> Admin consent and directory permissions are required for this step.
 
 ### 8. Update/Verify Ingestion URI in Logic App
 
