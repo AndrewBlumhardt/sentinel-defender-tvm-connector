@@ -84,12 +84,12 @@ Clone the repo, then run a single PowerShell 7+ script that deploys DCE → DCR 
 # Azure Commercial
 .\Deploy-All.ps1 `
     -ResourceGroup      <rg-name> `
-    -WorkspaceResourceId /subscriptions/<sub>/resourceGroups/<rg>/providers/microsoft.operationalinsights/workspaces/<ws>
+  -WorkspaceResourceId /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.OperationalInsights/workspaces/<ws>
 
 # Azure Government
 .\Deploy-All-Gov.ps1 `
     -ResourceGroup      <rg-name> `
-    -WorkspaceResourceId /subscriptions/<sub>/resourceGroups/<rg>/providers/microsoft.operationalinsights/workspaces/<ws>
+  -WorkspaceResourceId /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.OperationalInsights/workspaces/<ws>
 ```
 
 All parameters except `-ResourceGroup` and `-WorkspaceResourceId` have defaults and are optional. Run without arguments to be prompted interactively.
@@ -100,33 +100,21 @@ All parameters except `-ResourceGroup` and `-WorkspaceResourceId` have defaults 
 
 Deploy in this order: DCE -> DCR -> Logic App.
 
-### Azure Commercial
+### Azure Commercial (single row)
 
-1. DCE
+<p>
+  <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy DCE to Azure"></a>
+  <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy DCR to Azure"></a>
+  <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy Logic App to Azure"></a>
+</p>
 
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json)
+### Azure Government (single row)
 
-2. DCR
-
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json)
-
-3. Logic App
-
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json)
-
-### Azure Government
-
-1. DCE
-
-[![Deploy to Azure Government](https://aka.ms/deploytoazuregovbutton)](https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json)
-
-2. DCR
-
-[![Deploy to Azure Government](https://aka.ms/deploytoazuregovbutton)](https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json)
-
-3. Logic App
-
-[![Deploy to Azure Government](https://aka.ms/deploytoazuregovbutton)](https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json)
+<p>
+  <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy DCE to Azure Government"></a>
+  <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy DCR to Azure Government"></a>
+  <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy Logic App to Azure Government"></a>
+</p>
 
 ## Step-by-Step Deployment (Recommended)
 
@@ -155,11 +143,11 @@ az login
 ```bash
 RG=<resource-group>
 LOCATION=<location>
-WORKSPACE_RESOURCE_ID=<workspace-resource-id>
+WORKSPACE_RESOURCE_ID=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/Microsoft.OperationalInsights/workspaces/my-workspace
 
 DCE_NAME=DeviceTvmSnapshot
 DCR_NAME=dcr-DeviceTvmSnapshot
-LOGICAPP_NAME=QueryGraphAPI
+LOGICAPP_NAME=DeviceTvmSnapshotConnector
 ```
 
 ### 2. Deploy DCE
@@ -229,6 +217,8 @@ az deployment group create \
 
 ### 6. Assign Managed Identity Role on DCR (Ingestion)
 
+`Monitoring Metrics Publisher` on the DCR is required for Logs Ingestion API writes. There is no broader Sentinel role, including Sentinel Contributor, that substitutes for this requirement.
+
 ```bash
 LA_MI_PRINCIPAL_ID=$(az logic workflow show -g $RG -n $LOGICAPP_NAME --query identity.principalId -o tsv)
 
@@ -241,10 +231,9 @@ az role assignment create \
 
 ### 7. Assign Defender API App Role to Managed Identity
 
-This connector uses API permissions for Defender Advanced Hunting (not Azure RBAC). Assign one of:
+This connector uses the Defender Advanced Hunting API. The Logic App managed identity needs the `ThreatHunting.Read.All` application permission on the `WindowsDefenderATP` service principal.
 
-- `AdvancedQuery.Read.All`
-- `ThreatHunting.Read.All`
+This must be assigned as an app role assignment with Azure CLI / Microsoft Graph. An Entra role assignment does not replace it.
 
 Example (Microsoft Graph app role assignment flow):
 
@@ -252,7 +241,6 @@ Example (Microsoft Graph app role assignment flow):
 # Service principal for Defender for Endpoint API (varies by tenant/cloud naming)
 MDE_RESOURCE_SP_ID=$(az ad sp list --display-name "WindowsDefenderATP" --query "[0].id" -o tsv)
 
-# Pick one role value: AdvancedQuery.Read.All or ThreatHunting.Read.All
 APP_ROLE_ID=$(az ad sp show --id $MDE_RESOURCE_SP_ID --query "appRoles[?value=='ThreatHunting.Read.All' && contains(allowedMemberTypes, 'Application')].id | [0]" -o tsv)
 
 az rest --method POST \
@@ -265,7 +253,22 @@ Admin consent and directory permissions are required for this step.
 
 ### 8. Update/Verify Ingestion URI in Logic App
 
-If DCR or DCE values change, redeploy Logic App with updated `logsIngestionUri` or update the HTTP action in designer.
+The deployment script already constructs this value from the deployed DCE ingest endpoint and DCR immutable ID, then passes it into the Logic App deployment automatically.
+
+If DCR or DCE values change later, recompute the URI from variables and redeploy the Logic App with the updated `logsIngestionUri` value instead of editing the workflow manually.
+
+```bash
+DCR_IMMUTABLE_ID=$(az monitor data-collection rule show -g $RG -n $DCR_NAME --query immutableId -o tsv)
+DCE_INGEST_ENDPOINT=$(az monitor data-collection endpoint show -g $RG -n $DCE_NAME --query logsIngestion.endpoint -o tsv)
+
+LOGS_INGEST_URI="${DCE_INGEST_ENDPOINT}dataCollectionRules/${DCR_IMMUTABLE_ID}/streams/Custom-DeviceTvmSnapshot_CL?api-version=2023-01-01"
+
+az deployment group create \
+  --resource-group $RG \
+  --template-file "logic app/template.json" \
+  --parameters @"logic app/parameters.commercial.json" \
+  --parameters workflows_QueryGraphAPI_name=$LOGICAPP_NAME location=$LOCATION logsIngestionUri="$LOGS_INGEST_URI"
+```
 
 Expected format:
 
@@ -308,13 +311,13 @@ Scope:
 Data Collection Rule (DCR)
 ```
 
+`Monitoring Metrics Publisher` is the required role for this DCR ingestion path. There is no equivalent broader Sentinel role that replaces it.
+
 ### Defender Advanced Hunting API Permission
 
 Assign managed identity app role:
 
 ```text
-AdvancedQuery.Read.All
-or
 ThreatHunting.Read.All
 ```
 
@@ -373,6 +376,8 @@ Practical limit:
 ```text
 ~5,000 devices before runtime becomes multi-hour
 ```
+
+For environments with more than 5,000 devices, each run may take several hours.
 
 ## Known Limitations
 

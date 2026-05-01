@@ -37,7 +37,7 @@
     Name for the Data Collection Rule. Default: dcr-DeviceTvmSnapshot
 
 .PARAMETER LogicAppName
-    Name for the Logic App. Default: QueryGraphAPI
+    Name for the Logic App. Default: DeviceTvmSnapshotConnector
 
 .PARAMETER Location
     Azure region. Defaults to the resource group's region when omitted.
@@ -78,7 +78,7 @@ param(
     [string]$DcrName = 'dcr-DeviceTvmSnapshot',
 
     [Parameter(Mandatory = $false)]
-    [string]$LogicAppName = 'QueryGraphAPI',
+    [string]$LogicAppName = 'DeviceTvmSnapshotConnector',
 
     [Parameter(Mandatory = $false)]
     [string]$Location,
@@ -99,6 +99,8 @@ $huntingUri      = if ($Government) { 'https://graph.microsoft.us/v1.0/security/
 $huntingAudience = if ($Government) { 'https://graph.microsoft.us' }   else { 'https://graph.microsoft.com' }
 $monitorAudience = if ($Government) { 'https://monitor.azure.us' }     else { 'https://monitor.azure.com' }
 $graphApiBase    = if ($Government) { 'https://graph.microsoft.us' }   else { 'https://graph.microsoft.com' }
+$defenderSpName  = 'WindowsDefenderATP'
+$defenderAppRole = 'ThreatHunting.Read.All'
 
 $repoOwner  = 'AndrewBlumhardt'
 $repoName   = 'sentinel-defender-tvm-connector'
@@ -302,8 +304,22 @@ if ($failed.Count -gt 0) {
 
 # ---- Next Steps ----------------------------------------------------------------
 
-$graphConsent = if ($Government) { "az rest --method POST --url `"$graphApiBase/v1.0/servicePrincipals/$miPrincipalId/appRoleAssignments`" ..." } `
-                else { "az rest --method POST --url `"$graphApiBase/v1.0/servicePrincipals/$miPrincipalId/appRoleAssignments`" ..." }
+$updateLogicAppCommand = @(
+    'az deployment group create',
+    "  --resource-group $ResourceGroup",
+    '  --template-file "logic app/template.json"',
+    (if ($Government) { '  --parameters @"logic app/parameters.gov.json"' } else { '  --parameters @"logic app/parameters.commercial.json"' }),
+    "  --parameters workflows_QueryGraphAPI_name=$LogicAppName location=$Location logsIngestionUri=\"$logsIngestionUri\""
+) -join "`n"
+
+$defenderCliCommands = @(
+    "$([Environment]::NewLine)# Resolve the Defender for Endpoint service principal",
+    "MDE_RESOURCE_SP_ID=`$(az ad sp list --display-name \"$defenderSpName\" --query \"[0].id\" -o tsv)",
+    "$([Environment]::NewLine)# Resolve the Threat Hunting app role ID",
+    "APP_ROLE_ID=`$(az ad sp show --id `$MDE_RESOURCE_SP_ID --query \"appRoles[?value=='$defenderAppRole' && contains(allowedMemberTypes, 'Application')].id | [0]\" -o tsv)",
+    "$([Environment]::NewLine)# Assign the app role to the Logic App managed identity",
+    "az rest --method POST --url \"$graphApiBase/v1.0/servicePrincipals/$miPrincipalId/appRoleAssignments\" --headers \"Content-Type=application/json\" --body '{\"principalId\":\"$miPrincipalId\",\"resourceId\":\"'\"`$MDE_RESOURCE_SP_ID\"'\",\"appRoleId\":\"'\"`$APP_ROLE_ID\"'\"}'"
+) -join "`n"
 
 Write-Host @"
 
@@ -312,13 +328,23 @@ Write-Host @"
 1. Assign Defender API app role to the Logic App managed identity (requires admin consent):
 
      Logic App MI principal ID : $miPrincipalId
-     Required app role         : ThreatHunting.Read.All (or AdvancedQuery.Read.All)
-     Resource service principal: WindowsDefenderATP
+         Required app role         : $defenderAppRole
+         Resource service principal: $defenderSpName
 
-   Use Azure portal > Entra ID > Enterprise Apps > WindowsDefenderATP > Permissions
-   or run the Graph API app role assignment flow documented in README.md.
+     This is an app role assignment on the Defender service principal, not an Entra directory role.
+     Use Azure CLI / Microsoft Graph. Example:
 
-2. Test: trigger the Logic App manually in the portal (Run Trigger on Recurrence),
+$defenderCliCommands
+
+2. Update or verify the Logic App ingestion URI by recomputing it from the deployed DCE/DCR values:
+
+         $logsIngestionUri
+
+     If you need to redeploy the Logic App with the current URI, run:
+
+$updateLogicAppCommand
+
+3. Test: trigger the Logic App manually in the portal (Run Trigger on Recurrence),
    then validate data in Log Analytics:
 
      DeviceTvmSnapshot_CL

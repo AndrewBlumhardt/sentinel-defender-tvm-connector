@@ -20,7 +20,7 @@ param(
     [Parameter(Mandatory = $false)] [string]$WorkspaceResourceId,
     [Parameter(Mandatory = $false)] [string]$DceName       = 'DeviceTvmSnapshot',
     [Parameter(Mandatory = $false)] [string]$DcrName       = 'dcr-DeviceTvmSnapshot',
-    [Parameter(Mandatory = $false)] [string]$LogicAppName  = 'QueryGraphAPI',
+    [Parameter(Mandatory = $false)] [string]$LogicAppName  = 'DeviceTvmSnapshotConnector',
     [Parameter(Mandatory = $false)] [string]$Location,
     [Parameter(Mandatory = $false)] [string]$Subscription
 )

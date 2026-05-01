@@ -3,7 +3,7 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "workflows_QueryGraphAPI_name": {
-            "defaultValue": "QueryGraphAPI",
+            "defaultValue": "DeviceTvmSnapshotConnector",
             "type": "String"
         },
         "location": {
@@ -26,7 +26,7 @@
             "type": "String"
         },
         "recurrenceInterval": {
-            "defaultValue": 3,
+            "defaultValue": 1,
             "type": "int"
         },
         "recurrenceFrequency": {

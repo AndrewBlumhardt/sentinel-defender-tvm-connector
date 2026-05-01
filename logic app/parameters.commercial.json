@@ -21,7 +21,7 @@
             "value": "https://monitor.azure.com"
         },
         "recurrenceInterval": {
-            "value": 3
+            "value": 1
         },
         "recurrenceFrequency": {
             "value": "Day"
