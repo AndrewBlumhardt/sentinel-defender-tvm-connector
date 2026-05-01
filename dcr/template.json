@@ -62,8 +62,8 @@
                                 "type": "dynamic"
                             },
                             {
-                                "name": "TenantId",
-                                "type": "guid"
+                                "name": "TenantId_string",
+                                "type": "string"
                             },
                             {
                                 "name": "TvmRecordType",
@@ -389,7 +389,7 @@
                         "destinations": [
                             "laDestination"
                         ],
-                        "transformKql": "source | extend TenantId = toguid(TenantId)",
+                        "transformKql": "source | extend TenantId_string = tostring(TenantId) | project-away TenantId",
                         "outputStream": "Custom-DeviceTvmSnapshot_CL"
                     }
                 ]
