@@ -1,0 +1,327 @@
+#Requires -Version 7.0
+<#
+.SYNOPSIS
+    Deploys the Defender TVM Snapshot Connector infrastructure to an Azure resource group.
+
+.DESCRIPTION
+    Deploys the following components in order from GitHub templates:
+        1. Data Collection Endpoint (DCE)
+        2. Data Collection Rule (DCR)
+        3. Logic App
+
+    After deployment the script:
+        - Assigns the Logic App managed identity the Monitoring Metrics Publisher
+          role on the DCR.
+        - Prints the next-step instructions for assigning the Defender API app role.
+
+    Use -Government to target Azure Government (AzureUSGovernment). Omit it for
+    Azure commercial (AzureCloud).
+
+    Prerequisites:
+        - Azure CLI installed and signed in: az login
+        - PowerShell 7+
+        - Contributor (or equivalent) rights on the target resource group
+        - Permission to create RBAC role assignments on the DCR
+
+.PARAMETER ResourceGroup
+    Name of the existing resource group to deploy into.
+
+.PARAMETER WorkspaceResourceId
+    Full resource ID of the Log Analytics workspace.
+    Example: /subscriptions/<sub>/resourceGroups/<rg>/providers/microsoft.operationalinsights/workspaces/<ws>
+
+.PARAMETER DceName
+    Name for the Data Collection Endpoint. Default: DeviceTvmSnapshot
+
+.PARAMETER DcrName
+    Name for the Data Collection Rule. Default: dcr-DeviceTvmSnapshot
+
+.PARAMETER LogicAppName
+    Name for the Logic App. Default: QueryGraphAPI
+
+.PARAMETER Location
+    Azure region. Defaults to the resource group's region when omitted.
+
+.PARAMETER Subscription
+    Subscription name or ID. Uses the current default when omitted.
+
+.PARAMETER Government
+    Switch to target Azure Government (AzureUSGovernment cloud).
+
+.EXAMPLE
+    # Azure commercial
+    .\Deploy-All.ps1 `
+        -ResourceGroup      my-rg `
+        -WorkspaceResourceId /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/microsoft.operationalinsights/workspaces/my-workspace
+
+.EXAMPLE
+    # Azure Government
+    .\Deploy-All.ps1 -Government `
+        -ResourceGroup      my-rg `
+        -WorkspaceResourceId /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/microsoft.operationalinsights/workspaces/my-workspace
+
+.EXAMPLE
+    .\Deploy-All.ps1  # prompts for required values interactively
+#>
+[CmdletBinding(SupportsShouldProcess)]
+param(
+    [Parameter(Mandatory = $false)]
+    [string]$ResourceGroup,
+
+    [Parameter(Mandatory = $false)]
+    [string]$WorkspaceResourceId,
+
+    [Parameter(Mandatory = $false)]
+    [string]$DceName = 'DeviceTvmSnapshot',
+
+    [Parameter(Mandatory = $false)]
+    [string]$DcrName = 'dcr-DeviceTvmSnapshot',
+
+    [Parameter(Mandatory = $false)]
+    [string]$LogicAppName = 'QueryGraphAPI',
+
+    [Parameter(Mandatory = $false)]
+    [string]$Location,
+
+    [Parameter(Mandatory = $false)]
+    [string]$Subscription,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$Government
+)
+
+$ErrorActionPreference = 'Stop'
+
+$targetCloud = if ($Government) { 'AzureUSGovernment' } else { 'AzureCloud' }
+$cloudLabel  = if ($Government) { 'Azure Government'  } else { 'Azure Commercial' }
+
+$huntingUri      = if ($Government) { 'https://graph.microsoft.us/v1.0/security/runHuntingQuery' }   else { 'https://graph.microsoft.com/v1.0/security/runHuntingQuery' }
+$huntingAudience = if ($Government) { 'https://graph.microsoft.us' }   else { 'https://graph.microsoft.com' }
+$monitorAudience = if ($Government) { 'https://monitor.azure.us' }     else { 'https://monitor.azure.com' }
+$graphApiBase    = if ($Government) { 'https://graph.microsoft.us' }   else { 'https://graph.microsoft.com' }
+
+$repoOwner  = 'AndrewBlumhardt'
+$repoName   = 'sentinel-defender-tvm-connector'
+$repoBranch = 'main'
+
+# ---- Prompt for required values ------------------------------------------------
+
+if (-not $ResourceGroup)       { $ResourceGroup       = Read-Host 'Resource group name' }
+if (-not $WorkspaceResourceId) { $WorkspaceResourceId = Read-Host 'Log Analytics workspace resource ID' }
+if (-not $Subscription)        { $Subscription        = Read-Host 'Subscription name or ID (leave blank for current default)' }
+
+# ---- Preflight: Azure CLI available --------------------------------------------
+
+$null = az --version 2>$null
+if ($LASTEXITCODE -ne 0) {
+    throw 'Azure CLI is not available. Install it from https://aka.ms/installazurecli and rerun.'
+}
+
+# ---- Cloud -----------------------------------------------------------------------
+
+$currentCloud = (az cloud show --query name -o tsv 2>$null)
+if ($currentCloud -ne $targetCloud) {
+    Write-Host "Switching Azure CLI from '$currentCloud' to '$targetCloud'." -ForegroundColor Yellow
+    az cloud set --name $targetCloud
+    if ($LASTEXITCODE -ne 0) { throw "Failed to switch Azure CLI to $targetCloud." }
+}
+
+# ---- Login check ----------------------------------------------------------------
+
+$accountJson = az account show -o json 2>$null
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($accountJson)) {
+    $loginHint = if ($Government) { 'az login --environment AzureUSGovernment' } else { 'az login' }
+    throw "Not logged in to Azure CLI. Run '$loginHint' and rerun the script."
+}
+
+if (-not [string]::IsNullOrWhiteSpace($Subscription)) {
+    az account set --subscription $Subscription
+    if ($LASTEXITCODE -ne 0) { throw "Unable to select subscription '$Subscription'." }
+    $accountJson = az account show -o json
+}
+
+$account = $accountJson | ConvertFrom-Json
+Write-Host "`nCloud: $cloudLabel | Subscription: $($account.name) ($($account.id))" -ForegroundColor DarkCyan
+
+# ---- Resolve location -----------------------------------------------------------
+
+if ([string]::IsNullOrWhiteSpace($Location)) {
+    $Location = az group show --name $ResourceGroup --query location -o tsv 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Location)) {
+        throw "Resource group '$ResourceGroup' not found in subscription $($account.id)."
+    }
+    Write-Host "Location not specified; using resource group location: $Location" -ForegroundColor DarkCyan
+}
+
+$timestamp = Get-Date -Format 'yyyyMMddHHmmss'
+$results   = [System.Collections.Generic.List[pscustomobject]]::new()
+
+function Invoke-Step {
+    param([string]$Label, [scriptblock]$Action)
+    Write-Host "`n[DEPLOY] $Label" -ForegroundColor Cyan
+    if ($WhatIfPreference) {
+        Write-Host '  WhatIf: skipping actual deployment.' -ForegroundColor DarkYellow
+        $results.Add([pscustomobject]@{ Step = $Label; Status = 'WhatIf' })
+        return $true
+    }
+    try {
+        & $Action
+        if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+        $results.Add([pscustomobject]@{ Step = $Label; Status = 'OK' })
+        return $true
+    }
+    catch {
+        Write-Host "  FAILED: $_" -ForegroundColor Red
+        $results.Add([pscustomobject]@{ Step = $Label; Status = "Failed: $_" })
+        return $false
+    }
+}
+
+# ---- 1. Deploy DCE ---------------------------------------------------------------
+
+$dceTemplatUri = "https://raw.githubusercontent.com/$repoOwner/$repoName/$repoBranch/dce/template.json"
+
+$ok = Invoke-Step 'Data Collection Endpoint (DCE)' {
+    az deployment group create `
+        --resource-group $ResourceGroup `
+        --name "dce-$timestamp" `
+        --template-uri $dceTemplatUri `
+        --parameters dataCollectionEndpoints_DeviceTvmSnapshot_name=$DceName location=$Location `
+        --output table
+}
+if (-not $ok) { throw 'DCE deployment failed. Aborting.' }
+
+$dceId             = az monitor data-collection endpoint show -g $ResourceGroup -n $DceName --query id                          -o tsv 2>$null
+$dceIngestEndpoint = az monitor data-collection endpoint show -g $ResourceGroup -n $DceName --query logsIngestion.endpoint       -o tsv 2>$null
+
+if ([string]::IsNullOrWhiteSpace($dceId) -or [string]::IsNullOrWhiteSpace($dceIngestEndpoint)) {
+    # Fallback for CLI versions that nest properties differently
+    $dceJson           = az monitor data-collection endpoint show -g $ResourceGroup -n $DceName -o json | ConvertFrom-Json
+    $dceId             = $dceJson.id
+    $dceIngestEndpoint = $dceJson.properties.logsIngestion.endpoint
+}
+
+Write-Host "  DCE resource ID    : $dceId"             -ForegroundColor DarkGray
+Write-Host "  DCE ingest endpoint: $dceIngestEndpoint" -ForegroundColor DarkGray
+
+# ---- 2. Deploy DCR ---------------------------------------------------------------
+
+$dcrTemplateUri = "https://raw.githubusercontent.com/$repoOwner/$repoName/$repoBranch/dcr/template.json"
+
+$ok = Invoke-Step 'Data Collection Rule (DCR)' {
+    az deployment group create `
+        --resource-group $ResourceGroup `
+        --name "dcr-$timestamp" `
+        --template-uri $dcrTemplateUri `
+        --parameters `
+            dataCollectionRules_dcr_DeviceTvmSnapshot_name=$DcrName `
+            dataCollectionEndpoints_DeviceTvmSnapshot_externalid=$dceId `
+            workspaceResourceId=$WorkspaceResourceId `
+            location=$Location `
+        --output table
+}
+if (-not $ok) { throw 'DCR deployment failed. Aborting.' }
+
+$dcrId          = az monitor data-collection rule show -g $ResourceGroup -n $DcrName --query id          -o tsv 2>$null
+$dcrImmutableId = az monitor data-collection rule show -g $ResourceGroup -n $DcrName --query immutableId  -o tsv 2>$null
+
+if ([string]::IsNullOrWhiteSpace($dcrImmutableId)) {
+    $dcrJson        = az monitor data-collection rule show -g $ResourceGroup -n $DcrName -o json | ConvertFrom-Json
+    $dcrId          = $dcrJson.id
+    $dcrImmutableId = $dcrJson.properties.immutableId
+}
+
+Write-Host "  DCR resource ID  : $dcrId"          -ForegroundColor DarkGray
+Write-Host "  DCR immutable ID : $dcrImmutableId" -ForegroundColor DarkGray
+
+# ---- 3. Build ingestion URI ------------------------------------------------------
+
+# Normalize endpoint (ensure trailing /)
+if (-not $dceIngestEndpoint.EndsWith('/')) { $dceIngestEndpoint += '/' }
+$logsIngestionUri = "${dceIngestEndpoint}dataCollectionRules/${dcrImmutableId}/streams/Custom-DeviceTvmSnapshot_CL?api-version=2023-01-01"
+Write-Host "  Logs ingestion URI: $logsIngestionUri" -ForegroundColor DarkGray
+
+# ---- 4. Deploy Logic App ---------------------------------------------------------
+
+$laTemplateUri = "https://raw.githubusercontent.com/$repoOwner/$repoName/$repoBranch/logic%20app/template.json"
+
+$ok = Invoke-Step 'Logic App' {
+    az deployment group create `
+        --resource-group $ResourceGroup `
+        --name "logicapp-$timestamp" `
+        --template-uri $laTemplateUri `
+        --parameters `
+            workflows_QueryGraphAPI_name=$LogicAppName `
+            location=$Location `
+            logsIngestionUri=$logsIngestionUri `
+            advancedHuntingUri=$huntingUri `
+            advancedHuntingAudience=$huntingAudience `
+            logsIngestionAudience=$monitorAudience `
+        --output table
+}
+if (-not $ok) { throw 'Logic App deployment failed. Aborting.' }
+
+# ---- 5. Assign Monitoring Metrics Publisher on DCR --------------------------------
+
+Write-Host "`n[RBAC] Assigning Monitoring Metrics Publisher on DCR..." -ForegroundColor Cyan
+$laJson        = az logic workflow show -g $ResourceGroup -n $LogicAppName -o json | ConvertFrom-Json
+$miPrincipalId = $laJson.identity.principalId
+
+if ([string]::IsNullOrWhiteSpace($miPrincipalId)) {
+    Write-Host '  WARNING: Could not retrieve Logic App managed identity. Assign Monitoring Metrics Publisher on the DCR manually.' -ForegroundColor Yellow
+    $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Skipped (MI not found)' })
+}
+else {
+    az role assignment create `
+        --assignee-object-id $miPrincipalId `
+        --assignee-principal-type ServicePrincipal `
+        --role 'Monitoring Metrics Publisher' `
+        --scope $dcrId `
+        --output none 2>$null
+
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host '  Role assigned successfully.' -ForegroundColor Green
+        $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'OK' })
+    }
+    else {
+        Write-Host '  WARNING: Role assignment failed. Assign Monitoring Metrics Publisher on the DCR manually.' -ForegroundColor Yellow
+        $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Failed - assign manually' })
+    }
+}
+
+# ---- Summary -------------------------------------------------------------------
+
+Write-Host "`n--- Deployment Summary ($cloudLabel) ---" -ForegroundColor Cyan
+$results | Format-Table -AutoSize
+
+$failed = @($results | Where-Object { $_.Status -notmatch '^(OK|WhatIf|Skipped)' })
+if ($failed.Count -gt 0) {
+    Write-Host "$($failed.Count) step(s) failed. Review the output above." -ForegroundColor Red
+    exit 1
+}
+
+# ---- Next Steps ----------------------------------------------------------------
+
+$graphConsent = if ($Government) { "az rest --method POST --url `"$graphApiBase/v1.0/servicePrincipals/$miPrincipalId/appRoleAssignments`" ..." } `
+                else { "az rest --method POST --url `"$graphApiBase/v1.0/servicePrincipals/$miPrincipalId/appRoleAssignments`" ..." }
+
+Write-Host @"
+
+--- Next Steps ---
+
+1. Assign Defender API app role to the Logic App managed identity (requires admin consent):
+
+     Logic App MI principal ID : $miPrincipalId
+     Required app role         : ThreatHunting.Read.All (or AdvancedQuery.Read.All)
+     Resource service principal: WindowsDefenderATP
+
+   Use Azure portal > Entra ID > Enterprise Apps > WindowsDefenderATP > Permissions
+   or run the Graph API app role assignment flow documented in README.md.
+
+2. Test: trigger the Logic App manually in the portal (Run Trigger on Recurrence),
+   then validate data in Log Analytics:
+
+     DeviceTvmSnapshot_CL
+     | summarize Rows=count(), Latest=max(TimeGenerated)
+
+"@ -ForegroundColor DarkCyan

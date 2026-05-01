@@ -76,6 +76,26 @@ These were removed because they accounted for the majority of data volume while 
     `-- parameters.gov.json
 ```
 
+## Deploy with Script (Recommended)
+
+Clone the repo, then run a single PowerShell 7+ script that deploys DCE → DCR → Logic App in order, wires up the managed identity RBAC, and prints next-step instructions.
+
+```powershell
+# Azure Commercial
+.\Deploy-All.ps1 `
+    -ResourceGroup      <rg-name> `
+    -WorkspaceResourceId /subscriptions/<sub>/resourceGroups/<rg>/providers/microsoft.operationalinsights/workspaces/<ws>
+
+# Azure Government
+.\Deploy-All-Gov.ps1 `
+    -ResourceGroup      <rg-name> `
+    -WorkspaceResourceId /subscriptions/<sub>/resourceGroups/<rg>/providers/microsoft.operationalinsights/workspaces/<ws>
+```
+
+All parameters except `-ResourceGroup` and `-WorkspaceResourceId` have defaults and are optional. Run without arguments to be prompted interactively.
+
+---
+
 ## Deploy To Azure (Portal Buttons)
 
 Deploy in this order: DCE -> DCR -> Logic App.
