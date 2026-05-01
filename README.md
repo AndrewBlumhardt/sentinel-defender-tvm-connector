@@ -100,7 +100,7 @@ All parameters except `-ResourceGroup` and `-WorkspaceResourceId` have defaults 
 
 Deploy in this order: DCE -> DCR -> Logic App.
 
-### Azure Commercial (single row)
+### Azure Commercial
 
 <p>
   <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy DCE to Azure"></a>
@@ -108,7 +108,7 @@ Deploy in this order: DCE -> DCR -> Logic App.
   <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy Logic App to Azure"></a>
 </p>
 
-### Azure Government (single row)
+### Azure Government
 
 <p>
   <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy DCE to Azure Government"></a>
@@ -219,6 +219,8 @@ az deployment group create \
 
 `Monitoring Metrics Publisher` on the DCR is required for Logs Ingestion API writes. There is no broader Sentinel role, including Sentinel Contributor, that substitutes for this requirement.
 
+You can assign this role either with Azure CLI (example below) or manually in the Azure portal on the DCR IAM blade.
+
 ```bash
 LA_MI_PRINCIPAL_ID=$(az logic workflow show -g $RG -n $LOGICAPP_NAME --query identity.principalId -o tsv)
 
@@ -236,6 +238,8 @@ This connector uses the Defender Advanced Hunting API. The Logic App managed ide
 This must be assigned with Azure CLI / Microsoft Graph as an app role assignment on the managed identity object. This connector does not use a separate app registration or client secret.
 
 The Azure portal UI does not provide a reliable path to assign this app role to managed identities. Use CLI/Graph for this step. No Azure RBAC/Entra role assignment can replace it.
+
+If preferred, this API permission can also be granted to a service principal instead of a managed identity.
 
 Example (Microsoft Graph app role assignment flow):
 
@@ -315,6 +319,8 @@ Data Collection Rule (DCR)
 
 `Monitoring Metrics Publisher` is the required role for this DCR ingestion path. There is no equivalent broader Sentinel role that replaces it.
 
+Assignment can be done by CLI or manually in Azure portal (DCR -> Access control (IAM)).
+
 ### Defender Advanced Hunting API Permission
 
 Assign managed identity app role:
@@ -324,6 +330,8 @@ ThreatHunting.Read.All
 ```
 
 This app role must be assigned via CLI/Graph to the managed identity object. No Azure/Sentinel RBAC role is an equivalent substitute.
+
+Service principal-based API authentication is also supported if preferred.
 
 ## Environment Endpoints
 
