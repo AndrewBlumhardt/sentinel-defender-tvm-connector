@@ -2,7 +2,7 @@
 
 ## Overview
 
-This project provides a Logic App-based proof of concept for exporting selected Microsoft Defender Threat and Vulnerability Management (TVM) Advanced Hunting tables into a custom Log Analytics / Microsoft Sentinel table.
+This project is a **Logic App-based proof of concept** for exporting selected Microsoft Defender Threat and Vulnerability Management (TVM) Advanced Hunting tables into a custom Log Analytics / Microsoft Sentinel table.
 
 The goal is to enable:
 
@@ -10,7 +10,7 @@ The goal is to enable:
 - Custom workbook and dashboard scenarios
 - Experimental analysis of TVM data in Sentinel
 
-This is not intended to be a fully scalable production connector. It works best for small to medium environments or targeted table exports.
+This is **not intended to be a fully scalable production connector**. It works best for **small to medium environments** or **targeted table exports**.
 
 ## Architecture
 
@@ -57,9 +57,9 @@ DeviceTvmSoftwareVulnerabilities
 - `DeviceTvmSoftwareVulnerabilitiesKB` is a global dataset (~300K records) and does not scale per device.
 - `DeviceTvmSoftwareVulnerabilities` represents similar data scoped to device software.
 
-Despite the table names including the word "Vulnerabilities" (which can imply critical must-have coverage), review of the returned data showed the value was less direct and less meaningful for this connector's core snapshot use case than expected.
+Despite the word "Vulnerabilities" in the names, review of the returned data showed the value was **less direct and less meaningful** for this connector's core snapshot use case than expected.
 
-These tables were removed because they accounted for most of the data volume and were a major scalability bottleneck. They can be added back if needed, but doing so significantly increases runtime and resource usage.
+These tables were removed because they accounted for **most of the data volume** and were a **major scalability bottleneck**. They can be added back if needed, but doing so significantly increases runtime and resource usage.
 
 ## Repository Layout
 
@@ -80,7 +80,7 @@ These tables were removed because they accounted for most of the data volume and
 
 ## Deploy with Script (Recommended)
 
-Clone the repo, then run a single PowerShell 7+ script that deploys DCE → DCR → Logic App in order, wires up the managed identity RBAC, and prints next-step instructions.
+Clone the repo, then run a single PowerShell 7+ script that deploys **DCE -> DCR -> Logic App** in order, wires up the managed identity RBAC, and prints next-step instructions.
 
 ```powershell
 # Azure Commercial
@@ -94,7 +94,7 @@ Clone the repo, then run a single PowerShell 7+ script that deploys DCE → DCR 
   -WorkspaceResourceId /subscriptions/<sub>/resourceGroups/<rg>/providers/Microsoft.OperationalInsights/workspaces/<ws>
 ```
 
-All parameters except `-ResourceGroup` and `-WorkspaceResourceId` have defaults and are optional. Run without arguments to be prompted interactively.
+Only `-ResourceGroup` and `-WorkspaceResourceId` are typically required. All other parameters have defaults. Run without arguments to be prompted interactively.
 
 ---
 
@@ -120,7 +120,7 @@ Deploy in this order: DCE -> DCR -> Logic App.
 
 ## Step-by-Step Deployment (Recommended)
 
-The most reliable method is staged deployment with explicit parameter values and post-deploy validation.
+The most reliable method is **staged deployment with explicit parameter values** and **post-deploy validation**.
 
 ### 0. Prerequisites
 
@@ -224,7 +224,7 @@ az deployment group create \
 
 ### 6. Assign Managed Identity Role on DCR (Ingestion)
 
-`Monitoring Metrics Publisher` on the DCR is required for Logs Ingestion API writes. There is no broader Sentinel role, including Sentinel Contributor, that substitutes for this requirement.
+`Monitoring Metrics Publisher` on the DCR is required for Logs Ingestion API writes. **No broader Sentinel role, including Sentinel Contributor, substitutes for this requirement.**
 
 > [!IMPORTANT]
 > `Monitoring Metrics Publisher` on the DCR is mandatory for this connector's ingestion path. No broader Sentinel role is an equivalent substitute.
@@ -245,9 +245,9 @@ az role assignment create \
 
 This connector uses the Defender Advanced Hunting API. The Logic App managed identity must be granted the `ThreatHunting.Read.All` app role on the Defender for Endpoint Enterprise application (`WindowsDefenderATP`).
 
-This must be assigned with Azure CLI / Microsoft Graph as an app role assignment on the managed identity object. This connector does not use a separate app registration or client secret.
+This is assigned with **Azure CLI / Microsoft Graph** as an app role assignment on the managed identity object. This connector does **not** use a separate app registration or client secret.
 
-The Azure portal UI does not provide a reliable path to assign this app role to managed identities. Use CLI/Graph for this step. No Azure RBAC/Entra role assignment can replace it.
+The Azure portal UI does not provide a reliable path to assign this app role to managed identities. **Use CLI/Graph for this step. No Azure RBAC or Entra role assignment can replace it.**
 
 > [!NOTE]
 > This repository defaults to managed identity and secretless auth. If preferred, this API permission can also be granted to a service principal.
@@ -323,33 +323,17 @@ DeviceTvmSnapshot_CL
 
 ### Ingestion RBAC
 
-Assign Logic App managed identity to:
-
-```text
-Monitoring Metrics Publisher
-```
-
-Scope:
-
-```text
-Data Collection Rule (DCR)
-```
-
-`Monitoring Metrics Publisher` is the required role for this DCR ingestion path. There is no equivalent broader Sentinel role that replaces it.
-
-Assignment can be done by CLI or manually in Azure portal (DCR -> Access control (IAM)).
+- **Role:** `Monitoring Metrics Publisher`
+- **Scope:** `Data Collection Rule (DCR)`
+- **Assignment method:** Azure CLI or Azure portal (`DCR -> Access control (IAM)`)
+- **Important:** No broader Sentinel role is an equivalent substitute.
 
 ### Defender Advanced Hunting API Permission
 
-Assign managed identity app role:
-
-```text
-ThreatHunting.Read.All
-```
-
-This app role must be assigned via CLI/Graph to the managed identity object. No Azure/Sentinel RBAC role is an equivalent substitute.
-
-Service principal-based API authentication is also supported if preferred.
+- **App role:** `ThreatHunting.Read.All`
+- **Assignment method:** Azure CLI / Microsoft Graph
+- **Important:** No Azure or Sentinel RBAC role is an equivalent substitute.
+- **Alternative:** Service principal-based API authentication is also supported if preferred.
 
 ## Environment Endpoints
 
@@ -419,7 +403,7 @@ Practical limit:
 ~5,000 devices before runtime becomes multi-hour
 ```
 
-For environments with more than 5,000 devices, each run may take several hours.
+For environments with more than **5,000 devices**, each run may take **several hours**.
 
 ## Known Limitations
 
@@ -434,17 +418,17 @@ For environments with more than 5,000 devices, each run may take several hours.
 
 Common fixes:
 
-- Most issues are basic setup or propagation problems: missing configuration, incorrect audiences, incomplete permission assignment, or running the Logic App too soon after granting access.
-- After assigning API permissions or RBAC, **wait 10 to 15 minutes** before running the Logic App.
-- If the Logic App run succeeds but you do not see data yet, **wait at least 30 minutes** before assuming failure. Missing tables usually means the new table has not appeared in the UI yet, not that one specific TVM table was skipped.
-- If the entire Logic App run fails, the most likely cause is authentication or configuration: wrong audience, missing `ThreatHunting.Read.All`, missing `Monitoring Metrics Publisher`, incorrect `logsIngestionUri`, or another skipped setup step.
-- If the Logic App run is only partially successful, such as one or more loop iterations failing, the most likely cause is scale pressure: batch size is too large, parallelism is too high, or Advanced Hunting API throttling is being hit.
+- **Most issues are setup or propagation issues:** missing configuration, incorrect audiences, incomplete permission assignment, or running the Logic App too soon after granting access.
+- **After assigning API permissions or RBAC, wait 10 to 15 minutes** before running the Logic App.
+- **If the Logic App run succeeds but you do not see data yet, wait at least 30 minutes** before assuming failure. Missing tables usually means the new table has not appeared in the UI yet, not that one specific TVM table was skipped.
+- **Complete run failure** usually means authentication or configuration problems: wrong audience, missing `ThreatHunting.Read.All`, missing `Monitoring Metrics Publisher`, incorrect `logsIngestionUri`, or another skipped setup step.
+- **Partial loop failures** usually mean scale pressure: batch size is too large, parallelism is too high, or Advanced Hunting API throttling is being hit.
 - If you are making other Defender Advanced Hunting API calls in parallel, those calls can contribute to throttling and reduce success rates for this workflow.
-- Payload too large -> reduce batch size (250 -> 200)
-- 429 errors or intermittent loop failures -> reduce parallelism (40 -> 20) and account for other API activity
-- DCR errors -> verify stream name, schema, and ingestion URI
-- Permission errors -> confirm API permissions, DCR role assignment, and correct cloud-specific audiences
-- If you add or remove TVM tables from this solution, update both Advanced Hunting queries in the Logic App template: the count query outside the loop (`HTTP-Count`) and the paged query inside the loop (`QueryAdvancedHunting`).
+- Payload too large: reduce batch size from `250` to `200`.
+- `429` errors or intermittent loop failures: reduce parallelism from `40` to `20` and account for other API activity.
+- DCR errors: verify stream name, schema, and ingestion URI.
+- Permission errors: confirm API permissions, DCR role assignment, and correct cloud-specific audiences.
+- If you add or remove TVM tables from this solution, update **both** Advanced Hunting queries in the Logic App template: the count query outside the loop (`HTTP-Count`) and the paged query inside the loop (`QueryAdvancedHunting`).
 
 ## Summary
 
