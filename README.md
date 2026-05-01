@@ -102,21 +102,10 @@ Only `-ResourceGroup` and `-WorkspaceResourceId` are typically required. All oth
 
 Deploy in this order: DCE -> DCR -> Logic App.
 
-### Azure Commercial
-
-<p>
-  <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy DCE to Azure"></a>
-  <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy DCR to Azure"></a>
-  <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy Logic App to Azure"></a>
-</p>
-
-### Azure Government
-
-<p>
-  <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy DCE to Azure Government"></a>
-  <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy DCR to Azure Government"></a>
-  <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy Logic App to Azure Government"></a>
-</p>
+| Cloud | DCE | DCR | Logic App |
+| --- | --- | --- | --- |
+| Azure Commercial | <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy DCE to Azure"></a> | <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy DCR to Azure"></a> | <a href="https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json"><img src="https://aka.ms/deploytoazurebutton" alt="Deploy Logic App to Azure"></a> |
+| Azure Government | <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy DCE to Azure Government"></a> | <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy DCR to Azure Government"></a> | <a href="https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json"><img src="https://aka.ms/deploytoazuregovbutton" alt="Deploy Logic App to Azure Government"></a> |
 
 ## Step-by-Step Deployment (Recommended)
 
