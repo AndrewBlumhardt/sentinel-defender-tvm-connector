@@ -132,11 +132,54 @@ az cloud set --name AzureUSGovernment
 az login
 ```
 
-### 1. Set Variables
+### 1. Pre-Deploy Data Collection (Required)
+
+Capture these values before running deployments:
+
+- Sentinel workspace name
+- Subscription ID
+- Workspace ARM resource ID
+- Workspace (Sentinel) region
+
+```bash
+SUBSCRIPTION_ID=$(az account show --query id -o tsv)
+WORKSPACE_NAME=<workspace-name>
+WORKSPACE_RG=<workspace-resource-group>
+
+WORKSPACE_RESOURCE_ID=$(az monitor log-analytics workspace show \
+  --resource-group $WORKSPACE_RG \
+  --workspace-name $WORKSPACE_NAME \
+  --query id -o tsv)
+
+WORKSPACE_REGION=$(az monitor log-analytics workspace show \
+  --resource-group $WORKSPACE_RG \
+  --workspace-name $WORKSPACE_NAME \
+  --query location -o tsv)
+
+echo "Subscription       : $SUBSCRIPTION_ID"
+echo "Workspace name     : $WORKSPACE_NAME"
+echo "Workspace ARM ID   : $WORKSPACE_RESOURCE_ID"
+echo "Workspace region   : $WORKSPACE_REGION"
+```
+
+> [!IMPORTANT]
+> **DCE, DCR, and Log Analytics workspace must all be in the same region.** Set your deployment `LOCATION` to the workspace region.
+
+ARM ID examples (fully qualified):
+
+```text
+Workspace ARM ID:
+/subscriptions/<subscription-id>/resourceGroups/<workspace-rg>/providers/Microsoft.OperationalInsights/workspaces/<workspace-name>
+
+DCE ARM ID (this is the value for dataCollectionEndpointId / dataCollectionEndpoints_DeviceTvmSnapshot_externalid):
+/subscriptions/<subscription-id>/resourceGroups/<dce-rg>/providers/Microsoft.Insights/dataCollectionEndpoints/<dce-name>
+```
+
+### 2. Set Variables
 
 ```bash
 RG=<resource-group>
-LOCATION=<location>
+LOCATION=$WORKSPACE_REGION
 WORKSPACE_RESOURCE_ID=/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/my-rg/providers/Microsoft.OperationalInsights/workspaces/my-workspace
 
 DCE_NAME=DeviceTvmSnapshot
@@ -144,47 +187,7 @@ DCR_NAME=dcr-DeviceTvmSnapshot
 LOGICAPP_NAME=DeviceTvmSnapshotConnector
 ```
 
-If you need help finding these IDs, use the commands below.
-
-### 1a. Find Required IDs (Workspace Resource ID and DCE External ID)
-
-Find workspace resource ID:
-
-```bash
-# Option 1: if you know workspace resource group + workspace name
-WORKSPACE_RG=<workspace-resource-group>
-WORKSPACE_NAME=<workspace-name>
-
-WORKSPACE_RESOURCE_ID=$(az monitor log-analytics workspace show \
-  --resource-group $WORKSPACE_RG \
-  --workspace-name $WORKSPACE_NAME \
-  --query id -o tsv)
-
-echo $WORKSPACE_RESOURCE_ID
-
-# Option 2: list all workspaces in current subscription
-az monitor log-analytics workspace list --query "[].{name:name, rg:resourceGroup, id:id}" -o table
-```
-
-Find DCE external ID (this is the DCE resource ID used by DCR parameter `dataCollectionEndpoints_DeviceTvmSnapshot_externalid`):
-
-```bash
-# If DCE already exists
-DCE_ID=$(az monitor data-collection endpoint show -g $RG -n $DCE_NAME --query id -o tsv)
-echo $DCE_ID
-
-# If you need to browse DCEs first
-az monitor data-collection endpoint list -g $RG --query "[].{name:name, id:id}" -o table
-```
-
-Quick validation:
-
-```bash
-echo "Workspace: $WORKSPACE_RESOURCE_ID"
-echo "DCE ID   : $DCE_ID"
-```
-
-### 2. Deploy DCE
+### 3. Deploy DCE
 
 ```bash
 az deployment group create \
@@ -196,7 +199,7 @@ az deployment group create \
 DCE_ID=$(az monitor data-collection endpoint show -g $RG -n $DCE_NAME --query id -o tsv)
 ```
 
-### 3. Deploy DCR
+### 4. Deploy DCR
 
 ```bash
 az deployment group create \
@@ -212,7 +215,7 @@ az deployment group create \
 DCR_ID=$(az monitor data-collection rule show -g $RG -n $DCR_NAME --query id -o tsv)
 ```
 
-### 4. Build Logs Ingestion URI (DCE + DCR Immutable ID)
+### 5. Build Logs Ingestion URI (DCE + DCR Immutable ID)
 
 ```bash
 DCR_IMMUTABLE_ID=$(az monitor data-collection rule show -g $RG -n $DCR_NAME --query immutableId -o tsv)
@@ -229,7 +232,7 @@ LOGS_INGEST_URI="${DCE_INGEST_ENDPOINT}dataCollectionRules/${DCR_IMMUTABLE_ID}/s
 echo $LOGS_INGEST_URI
 ```
 
-### 5. Deploy Logic App
+### 6. Deploy Logic App
 
 Use the cloud-specific sample parameters and pass the computed `logsIngestionUri`.
 
@@ -254,7 +257,7 @@ az deployment group create \
   --parameters workflows_QueryGraphAPI_name=$LOGICAPP_NAME location=$LOCATION logsIngestionUri="$LOGS_INGEST_URI"
 ```
 
-### 6. Assign Managed Identity Role on DCR (Ingestion)
+### 7. Assign Managed Identity Role on DCR (Ingestion)
 
 `Monitoring Metrics Publisher` on the DCR is required for Logs Ingestion API writes. **No broader Sentinel role, including Sentinel Contributor, substitutes for this requirement.**
 
@@ -273,7 +276,7 @@ az role assignment create \
   --scope $DCR_ID
 ```
 
-### 7. Assign Defender API App Role to Managed Identity
+### 8. Assign Defender API App Role to Managed Identity
 
 This connector uses the Defender Advanced Hunting API. The Logic App managed identity must be granted the `ThreatHunting.Read.All` app role on the Defender for Endpoint Enterprise application (`WindowsDefenderATP`).
 
@@ -301,7 +304,7 @@ az rest --method POST \
 > [!IMPORTANT]
 > Admin consent and directory permissions are required for this step.
 
-### 8. Update/Verify Ingestion URI in Logic App
+### 9. Update/Verify Ingestion URI in Logic App
 
 The deployment script already constructs this value from the deployed DCE ingest endpoint and DCR immutable ID, then passes it into the Logic App deployment automatically.
 
@@ -326,7 +329,7 @@ Expected format:
 {DCE_INGEST_ENDPOINT}dataCollectionRules/{DCR_IMMUTABLE_ID}/streams/Custom-DeviceTvmSnapshot_CL?api-version=2023-01-01
 ```
 
-### 9. Test End-to-End
+### 10. Test End-to-End
 
 1. Trigger the Logic App manually once from the portal (Run Trigger on `Recurrence`) for immediate validation.
 2. Confirm run status is Succeeded.
