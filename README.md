@@ -231,14 +231,16 @@ az role assignment create \
 
 ### 7. Assign Defender API App Role to Managed Identity
 
-This connector uses the Defender Advanced Hunting API. The Logic App managed identity needs the `ThreatHunting.Read.All` application permission on the `WindowsDefenderATP` service principal.
+This connector uses the Defender Advanced Hunting API. The Logic App managed identity must be granted the `ThreatHunting.Read.All` app role on the Defender for Endpoint Enterprise application (`WindowsDefenderATP`).
 
-This must be assigned as an app role assignment with Azure CLI / Microsoft Graph. An Entra role assignment does not replace it.
+This must be assigned with Azure CLI / Microsoft Graph as an app role assignment on the managed identity object. This connector does not use a separate app registration or client secret.
+
+The Azure portal UI does not provide a reliable path to assign this app role to managed identities. Use CLI/Graph for this step. No Azure RBAC/Entra role assignment can replace it.
 
 Example (Microsoft Graph app role assignment flow):
 
 ```bash
-# Service principal for Defender for Endpoint API (varies by tenant/cloud naming)
+# Defender for Endpoint Enterprise application object (varies by tenant/cloud naming)
 MDE_RESOURCE_SP_ID=$(az ad sp list --display-name "WindowsDefenderATP" --query "[0].id" -o tsv)
 
 APP_ROLE_ID=$(az ad sp show --id $MDE_RESOURCE_SP_ID --query "appRoles[?value=='ThreatHunting.Read.All' && contains(allowedMemberTypes, 'Application')].id | [0]" -o tsv)
@@ -320,6 +322,8 @@ Assign managed identity app role:
 ```text
 ThreatHunting.Read.All
 ```
+
+This app role must be assigned via CLI/Graph to the managed identity object. No Azure/Sentinel RBAC role is an equivalent substitute.
 
 ## Environment Endpoints
 

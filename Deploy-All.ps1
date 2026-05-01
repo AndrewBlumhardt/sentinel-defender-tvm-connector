@@ -313,7 +313,7 @@ $updateLogicAppCommand = @(
 ) -join "`n"
 
 $defenderCliCommands = @(
-    "$([Environment]::NewLine)# Resolve the Defender for Endpoint service principal",
+    "$([Environment]::NewLine)# Resolve the Defender for Endpoint Enterprise application object",
     "MDE_RESOURCE_SP_ID=`$(az ad sp list --display-name \"$defenderSpName\" --query \"[0].id\" -o tsv)",
     "$([Environment]::NewLine)# Resolve the Threat Hunting app role ID",
     "APP_ROLE_ID=`$(az ad sp show --id `$MDE_RESOURCE_SP_ID --query \"appRoles[?value=='$defenderAppRole' && contains(allowedMemberTypes, 'Application')].id | [0]\" -o tsv)",
@@ -328,10 +328,12 @@ Write-Host @"
 1. Assign Defender API app role to the Logic App managed identity (requires admin consent):
 
      Logic App MI principal ID : $miPrincipalId
-         Required app role         : $defenderAppRole
-         Resource service principal: $defenderSpName
+    Required app role         : $defenderAppRole
+    Defender enterprise app   : $defenderSpName
 
-     This is an app role assignment on the Defender service principal, not an Entra directory role.
+    This connector uses managed identity only. No separate app registration or client secret is required.
+    This is an app role assignment to the managed identity object via CLI/Graph, not an Entra directory role.
+    Azure portal UI does not reliably expose this assignment path for managed identities.
      Use Azure CLI / Microsoft Graph. Example:
 
 $defenderCliCommands
