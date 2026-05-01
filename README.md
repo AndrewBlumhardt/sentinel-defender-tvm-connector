@@ -187,7 +187,34 @@ DCR_NAME=dcr-DeviceTvmSnapshot
 LOGICAPP_NAME=DeviceTvmSnapshotConnector
 ```
 
-### 2. Deploy DCE
+### 2. Create or Verify Custom Table (Required Before DCR)
+
+The DCR deployment validates that `DeviceTvmSnapshot_CL` already exists in the target Log Analytics workspace.
+
+If this table does not exist yet, create it before deploying DCR:
+
+```bash
+az monitor log-analytics workspace table create \
+  --resource-group $WORKSPACE_RG \
+  --workspace-name $WORKSPACE_NAME \
+  --name DeviceTvmSnapshot_CL \
+  --columns TimeGenerated=datetime TableName=string
+```
+
+Verify table exists:
+
+```bash
+az monitor log-analytics workspace table show \
+  --resource-group $WORKSPACE_RG \
+  --workspace-name $WORKSPACE_NAME \
+  --name DeviceTvmSnapshot_CL \
+  --query "{name:name, provisioningState:provisioningState}" -o table
+```
+
+> [!IMPORTANT]
+> If DCR deployment fails with `InvalidOutputTable` for `Custom-DeviceTvmSnapshot_CL`, the custom table is missing (or not fully provisioned yet) in the destination workspace.
+
+### 3. Deploy DCE
 
 ```bash
 az deployment group create \
@@ -199,7 +226,7 @@ az deployment group create \
 DCE_ID=$(az monitor data-collection endpoint show -g $RG -n $DCE_NAME --query id -o tsv)
 ```
 
-### 3. Deploy DCR
+### 4. Deploy DCR
 
 ```bash
 az deployment group create \
@@ -215,7 +242,7 @@ az deployment group create \
 DCR_ID=$(az monitor data-collection rule show -g $RG -n $DCR_NAME --query id -o tsv)
 ```
 
-### 4. Build Logs Ingestion URI (DCE + DCR Immutable ID)
+### 5. Build Logs Ingestion URI (DCE + DCR Immutable ID)
 
 ```bash
 DCR_IMMUTABLE_ID=$(az monitor data-collection rule show -g $RG -n $DCR_NAME --query immutableId -o tsv)
@@ -232,7 +259,7 @@ LOGS_INGEST_URI="${DCE_INGEST_ENDPOINT}dataCollectionRules/${DCR_IMMUTABLE_ID}/s
 echo $LOGS_INGEST_URI
 ```
 
-### 5. Deploy Logic App
+### 6. Deploy Logic App
 
 Use the cloud-specific sample parameters and pass the computed `logsIngestionUri`.
 
@@ -257,7 +284,7 @@ az deployment group create \
   --parameters workflows_QueryGraphAPI_name=$LOGICAPP_NAME location=$LOCATION logsIngestionUri="$LOGS_INGEST_URI"
 ```
 
-### 6. Assign Managed Identity Role on DCR (Ingestion)
+### 7. Assign Managed Identity Role on DCR (Ingestion)
 
 `Monitoring Metrics Publisher` on the DCR is required for Logs Ingestion API writes. **No broader Sentinel role, including Sentinel Contributor, substitutes for this requirement.**
 
@@ -276,7 +303,7 @@ az role assignment create \
   --scope $DCR_ID
 ```
 
-### 7. Assign Defender API App Role to Managed Identity
+### 8. Assign Defender API App Role to Managed Identity
 
 This connector uses the Defender Advanced Hunting API. The Logic App managed identity must be granted the `ThreatHunting.Read.All` app role on the Defender for Endpoint Enterprise application (`WindowsDefenderATP`).
 
@@ -304,7 +331,7 @@ az rest --method POST \
 > [!IMPORTANT]
 > Admin consent and directory permissions are required for this step.
 
-### 8. Update/Verify Ingestion URI in Logic App
+### 9. Update/Verify Ingestion URI in Logic App
 
 The deployment script already constructs this value from the deployed DCE ingest endpoint and DCR immutable ID, then passes it into the Logic App deployment automatically.
 
@@ -329,7 +356,7 @@ Expected format:
 {DCE_INGEST_ENDPOINT}dataCollectionRules/{DCR_IMMUTABLE_ID}/streams/Custom-DeviceTvmSnapshot_CL?api-version=2023-01-01
 ```
 
-### 9. Test End-to-End
+### 10. Test End-to-End
 
 1. Trigger the Logic App manually once from the portal (Run Trigger on `Recurrence`) for immediate validation.
 2. Confirm run status is Succeeded.

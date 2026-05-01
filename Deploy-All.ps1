@@ -166,6 +166,38 @@ if ([string]::IsNullOrWhiteSpace($Location)) {
     Write-Host "Location not specified; using resource group location: $Location" -ForegroundColor DarkCyan
 }
 
+$workspaceMatch = [regex]::Match(
+    $WorkspaceResourceId,
+    '^/subscriptions/[^/]+/resourceGroups/([^/]+)/providers/Microsoft\.OperationalInsights/workspaces/([^/]+)$',
+    [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
+)
+
+if (-not $workspaceMatch.Success) {
+    throw "WorkspaceResourceId is not a valid Log Analytics workspace ARM ID: $WorkspaceResourceId"
+}
+
+$workspaceRg   = $workspaceMatch.Groups[1].Value
+$workspaceName = $workspaceMatch.Groups[2].Value
+$tableName     = 'DeviceTvmSnapshot_CL'
+
+Write-Host "Validating workspace table '$tableName' in workspace '$workspaceName'..." -ForegroundColor DarkCyan
+$tableJson = az monitor log-analytics workspace table show `
+    --resource-group $workspaceRg `
+    --workspace-name $workspaceName `
+    --name $tableName `
+    -o json 2>$null
+
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($tableJson)) {
+    throw @"
+Required Log Analytics custom table '$tableName' was not found in workspace '$workspaceName' (resource group '$workspaceRg').
+
+Create it first, then rerun deployment:
+az monitor log-analytics workspace table create --resource-group $workspaceRg --workspace-name $workspaceName --name $tableName --columns TimeGenerated=datetime TableName=string
+
+This prevents DCR deployment error: InvalidOutputTable for stream 'Custom-DeviceTvmSnapshot_CL'.
+"@
+}
+
 $timestamp = Get-Date -Format 'yyyyMMddHHmmss'
 $results   = [System.Collections.Generic.List[pscustomobject]]::new()
 
