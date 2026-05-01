@@ -20,7 +20,7 @@ The workflow follows a simple pattern:
 2. It queries Defender Advanced Hunting for selected TVM tables.
 3. Results are paged using row number batching.
 4. Data is written to Log Analytics using the Logs Ingestion API (DCR/DCE pipeline).
-5. Data lands in a custom table (for example: `DeviceTvmSnapshot_CL`).
+5. The data lands in a single table called `DeviceTvmSnapshot_CL`.
 
 Core components:
 
@@ -57,7 +57,9 @@ DeviceTvmSoftwareVulnerabilities
 - `DeviceTvmSoftwareVulnerabilitiesKB` is a global dataset (~300K records) and does not scale per device.
 - `DeviceTvmSoftwareVulnerabilities` represents similar data scoped to device software.
 
-These were removed because they accounted for the majority of data volume while providing limited additional value. They can be added back if needed, but doing so significantly impacts scalability.
+Despite the table names including the word "Vulnerabilities" (which can imply critical must-have coverage), review of the returned data showed the value was less direct and less meaningful for this connector's core snapshot use case than expected.
+
+These tables were removed because they accounted for most of the data volume and were a major scalability bottleneck. They can be added back if needed, but doing so significantly increases runtime and resource usage.
 
 ## Repository Layout
 
@@ -198,6 +200,11 @@ echo $LOGS_INGEST_URI
 ### 5. Deploy Logic App
 
 Use the cloud-specific sample parameters and pass the computed `logsIngestionUri`.
+
+> [!IMPORTANT]
+> If you configure or adjust the Logic App HTTP actions manually in the portal, verify the Managed Identity authentication audience values for your cloud. This is easy to overlook and will cause authentication failures.
+> - Commercial: `advancedHuntingAudience=https://graph.microsoft.com`, `logsIngestionAudience=https://monitor.azure.com`
+> - Government: `advancedHuntingAudience=https://graph.microsoft.us`, `logsIngestionAudience=https://monitor.azure.us`
 
 ```bash
 # Commercial
