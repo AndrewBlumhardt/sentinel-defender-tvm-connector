@@ -298,14 +298,20 @@ Expected format:
 
 1. Trigger the Logic App manually once from the portal (Run Trigger on `Recurrence`) for immediate validation.
 2. Confirm run status is Succeeded.
-3. Validate data landed in Log Analytics:
+3. If you just assigned credentials or permissions, wait 10 to 15 minutes for them to propagate before running the Logic App.
+4. If the Logic App run completes successfully, wait at least 30 minutes before assuming the solution is not working. New tables and fresh data can take time to appear in the Log Analytics and Sentinel user interfaces.
+
+> [!IMPORTANT]
+> If the Logic App run succeeds, be patient before troubleshooting missing data. It can take 30 minutes or more for a newly created table and its records to become visible in the UI.
+
+5. Validate data landed in Log Analytics:
 
 ```kusto
 DeviceTvmSnapshot_CL
 | summarize Rows=count(), Latest=max(TimeGenerated)
 ```
 
-4. Validate table coverage:
+6. Validate table coverage:
 
 ```kusto
 DeviceTvmSnapshot_CL
@@ -416,11 +422,17 @@ For environments with more than 5,000 devices, each run may take several hours.
 
 Common fixes:
 
+- Most issues are basic setup or propagation problems: missing configuration, incorrect audiences, incomplete permission assignment, or running the Logic App too soon after granting access.
+- After assigning API permissions or RBAC, wait 10 to 15 minutes before running the Logic App.
+- If the Logic App run succeeds but you do not see data yet, wait at least 30 minutes before assuming failure. Missing tables usually means the new table has not appeared in the UI yet, not that one specific TVM table was skipped.
+- If the entire Logic App run fails, the most likely cause is authentication or configuration: wrong audience, missing `ThreatHunting.Read.All`, missing `Monitoring Metrics Publisher`, incorrect `logsIngestionUri`, or another skipped setup step.
+- If the Logic App run is only partially successful, such as one or more loop iterations failing, the most likely cause is scale pressure: batch size is too large, parallelism is too high, or Advanced Hunting API throttling is being hit.
+- If you are making other Defender Advanced Hunting API calls in parallel, those calls can contribute to throttling and reduce success rates for this workflow.
 - Payload too large -> reduce batch size (250 -> 200)
-- 429 errors -> reduce parallelism (40 -> 20)
-- Missing table -> wait for initial ingestion to complete
-- DCR errors -> verify stream name and schema
-- Permission errors -> confirm API permissions and DCR role assignment
+- 429 errors or intermittent loop failures -> reduce parallelism (40 -> 20) and account for other API activity
+- DCR errors -> verify stream name, schema, and ingestion URI
+- Permission errors -> confirm API permissions, DCR role assignment, and correct cloud-specific audiences
+- If you add or remove TVM tables from this solution, update both Advanced Hunting queries in the Logic App template: the count query outside the loop (`HTTP-Count`) and the paged query inside the loop (`QueryAdvancedHunting`).
 
 ## Summary
 
