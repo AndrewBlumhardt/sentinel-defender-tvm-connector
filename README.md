@@ -298,11 +298,11 @@ Expected format:
 
 1. Trigger the Logic App manually once from the portal (Run Trigger on `Recurrence`) for immediate validation.
 2. Confirm run status is Succeeded.
-3. If you just assigned credentials or permissions, wait 10 to 15 minutes for them to propagate before running the Logic App.
-4. If the Logic App run completes successfully, wait at least 30 minutes before assuming the solution is not working. New tables and fresh data can take time to appear in the Log Analytics and Sentinel user interfaces.
+3. If you just assigned credentials or permissions, **wait 10 to 15 minutes** for them to propagate before running the Logic App.
+4. If the Logic App run completes successfully, **wait at least 30 minutes** before assuming the solution is not working. New tables and fresh data can take time to appear in the Log Analytics and Sentinel user interfaces.
 
 > [!IMPORTANT]
-> If the Logic App run succeeds, be patient before troubleshooting missing data. It can take 30 minutes or more for a newly created table and its records to become visible in the UI.
+> If the Logic App run succeeds, be patient before troubleshooting missing data. It can take **30 minutes or more** for a newly created table and its records to become visible in the UI.
 
 5. Validate data landed in Log Analytics:
 
@@ -365,14 +365,6 @@ Azure Commercial defaults:
 - `advancedHuntingAudience`: `https://graph.microsoft.com`
 - `logsIngestionAudience`: `https://monitor.azure.com`
 
-## Recommended Methods (Research Notes)
-
-- Use staged IaC deployment (DCE -> DCR -> Logic App), not one giant template, for easier troubleshooting and safer retries.
-- Keep DCR and workspace in the same region.
-- Use least privilege RBAC (`Monitoring Metrics Publisher`) at DCR scope only.
-- Prefer managed identity and app role assignment for Defender API access.
-- Use DCR ingestion endpoint where possible; keep DCE path when private link or existing architecture requires it.
-
 ## Default Tuning
 
 Recommended starting values:
@@ -380,6 +372,26 @@ Recommended starting values:
 ```text
 WriteBatchSize = 250
 Parallelism = 40
+```
+
+Default schedule:
+
+```text
+Recurrence = Once per day
+```
+
+Because this solution captures periodic snapshots, you may choose to run it less frequently to reduce cost and data volume.
+
+Recommended schedule range:
+
+```text
+Every 3 days to every 7 days
+```
+
+That is usually feasible without materially affecting reporting for this use case.
+
+```text
+Do not run this more than once per day.
 ```
 
 If errors occur:
@@ -423,8 +435,8 @@ For environments with more than 5,000 devices, each run may take several hours.
 Common fixes:
 
 - Most issues are basic setup or propagation problems: missing configuration, incorrect audiences, incomplete permission assignment, or running the Logic App too soon after granting access.
-- After assigning API permissions or RBAC, wait 10 to 15 minutes before running the Logic App.
-- If the Logic App run succeeds but you do not see data yet, wait at least 30 minutes before assuming failure. Missing tables usually means the new table has not appeared in the UI yet, not that one specific TVM table was skipped.
+- After assigning API permissions or RBAC, **wait 10 to 15 minutes** before running the Logic App.
+- If the Logic App run succeeds but you do not see data yet, **wait at least 30 minutes** before assuming failure. Missing tables usually means the new table has not appeared in the UI yet, not that one specific TVM table was skipped.
 - If the entire Logic App run fails, the most likely cause is authentication or configuration: wrong audience, missing `ThreatHunting.Read.All`, missing `Monitoring Metrics Publisher`, incorrect `logsIngestionUri`, or another skipped setup step.
 - If the Logic App run is only partially successful, such as one or more loop iterations failing, the most likely cause is scale pressure: batch size is too large, parallelism is too high, or Advanced Hunting API throttling is being hit.
 - If you are making other Defender Advanced Hunting API calls in parallel, those calls can contribute to throttling and reduce success rates for this workflow.
