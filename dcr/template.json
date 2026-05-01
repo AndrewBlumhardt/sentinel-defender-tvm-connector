@@ -1,0 +1,399 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "dataCollectionRules_dcr_DeviceTvmSnapshot_name": {
+            "defaultValue": "dcr-DeviceTvmSnapshot",
+            "type": "String"
+        },
+        "dataCollectionEndpoints_DeviceTvmSnapshot_externalid": {
+            "type": "String"
+        },
+        "workspaceResourceId": {
+            "type": "String"
+        },
+        "location": {
+            "defaultValue": "[resourceGroup().location]",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Insights/dataCollectionRules",
+            "apiVersion": "2023-03-11",
+            "name": "[parameters('dataCollectionRules_dcr_DeviceTvmSnapshot_name')]",
+            "location": "[parameters('location')]",
+            "properties": {
+                "dataCollectionEndpointId": "[parameters('dataCollectionEndpoints_DeviceTvmSnapshot_externalid')]",
+                "streamDeclarations": {
+                    "Custom-DeviceTvmSnapshot_CL": {
+                        "columns": [
+                            {
+                                "name": "TableName",
+                                "type": "string"
+                            },
+                            {
+                                "name": "Timestamp",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "LastSeenTime_datetime",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "LastSeenTime_string",
+                                "type": "string"
+                            },
+                            {
+                                "name": "DeviceId",
+                                "type": "string"
+                            },
+                            {
+                                "name": "DeviceName",
+                                "type": "string"
+                            },
+                            {
+                                "name": "OSPlatform",
+                                "type": "string"
+                            },
+                            {
+                                "name": "AdditionalFields",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "TenantId",
+                                "type": "string"
+                            },
+                            {
+                                "name": "TvmRecordType",
+                                "type": "string"
+                            },
+                            {
+                                "name": "SourceSystem",
+                                "type": "string"
+                            },
+                            {
+                                "name": "MachineGroup",
+                                "type": "string"
+                            },
+                            {
+                                "name": "IgId",
+                                "type": "string"
+                            },
+                            {
+                                "name": "FieldName",
+                                "type": "string"
+                            },
+                            {
+                                "name": "Description",
+                                "type": "string"
+                            },
+                            {
+                                "name": "Categories",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "DataStructure",
+                                "type": "string"
+                            },
+                            {
+                                "name": "SoftwareVendor",
+                                "type": "string"
+                            },
+                            {
+                                "name": "SoftwareName",
+                                "type": "string"
+                            },
+                            {
+                                "name": "SoftwareVersion",
+                                "type": "string"
+                            },
+                            {
+                                "name": "RegistryPaths",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "DiskPaths",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "Thumbprint",
+                                "type": "string"
+                            },
+                            {
+                                "name": "Path",
+                                "type": "string"
+                            },
+                            {
+                                "name": "SerialNumber",
+                                "type": "string"
+                            },
+                            {
+                                "name": "IssuedTo",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "IssuedBy",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "FriendlyName",
+                                "type": "string"
+                            },
+                            {
+                                "name": "SignatureAlgorithm",
+                                "type": "string"
+                            },
+                            {
+                                "name": "KeySize",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "ExpirationDate",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "IssueDate",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "SubjectType",
+                                "type": "string"
+                            },
+                            {
+                                "name": "KeyUsage",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "ExtendedKeyUsage",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "ConfigurationId",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ConfigurationCategory",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ConfigurationSubcategory",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ConfigurationImpact",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "IsCompliant",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "IsApplicable",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "Context",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "IsExpectedUserImpact",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "TimeGenerated",
+                                "type": "datetime"
+                            },
+                            {
+                                "name": "BrowserName",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ExtensionId",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ExtensionName",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ExtensionDescription",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ExtensionVersion_string",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ExtensionVersion_dynamic",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "ExtensionRisk",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ExtensionVendor",
+                                "type": "string"
+                            },
+                            {
+                                "name": "IsActivated",
+                                "type": "string"
+                            },
+                            {
+                                "name": "InstallationTime",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "PermissionId",
+                                "type": "string"
+                            },
+                            {
+                                "name": "PermissionName",
+                                "type": "string"
+                            },
+                            {
+                                "name": "PermissionDescription",
+                                "type": "string"
+                            },
+                            {
+                                "name": "PermissionRisk",
+                                "type": "string"
+                            },
+                            {
+                                "name": "IsPermissionRequired",
+                                "type": "string"
+                            },
+                            {
+                                "name": "OSVersion",
+                                "type": "string"
+                            },
+                            {
+                                "name": "OSArchitecture",
+                                "type": "string"
+                            },
+                            {
+                                "name": "CveId",
+                                "type": "string"
+                            },
+                            {
+                                "name": "VulnerabilitySeverityLevel",
+                                "type": "string"
+                            },
+                            {
+                                "name": "RecommendedSecurityUpdate",
+                                "type": "string"
+                            },
+                            {
+                                "name": "RecommendedSecurityUpdateId",
+                                "type": "string"
+                            },
+                            {
+                                "name": "CveTags",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "CveMitigationStatus",
+                                "type": "string"
+                            },
+                            {
+                                "name": "AadDeviceId",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ComponentType",
+                                "type": "string"
+                            },
+                            {
+                                "name": "Manufacturer",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ComponentName",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ComponentFamily",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ComponentVersion",
+                                "type": "string"
+                            },
+                            {
+                                "name": "EndOfSupportStatus",
+                                "type": "string"
+                            },
+                            {
+                                "name": "EndOfSupportDate",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "ProductCodeCpe",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ConfigurationName",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ConfigurationDescription",
+                                "type": "string"
+                            },
+                            {
+                                "name": "RiskDescription",
+                                "type": "string"
+                            },
+                            {
+                                "name": "ConfigurationBenchmarks",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "Tags",
+                                "type": "dynamic"
+                            },
+                            {
+                                "name": "RemediationOptions",
+                                "type": "string"
+                            },
+                            {
+                                "name": "RowNumber",
+                                "type": "int"
+                            },
+                            {
+                                "name": "SnapshotDate",
+                                "type": "datetime"
+                            },
+                            {
+                                "name": "SnapshotRunTime",
+                                "type": "datetime"
+                            }
+                        ]
+                    }
+                },
+                "dataSources": {},
+                "destinations": {
+                    "logAnalytics": [
+                        {
+                            "workspaceResourceId": "[parameters('workspaceResourceId')]",
+                            "name": "laDestination"
+                        }
+                    ]
+                },
+                "dataFlows": [
+                    {
+                        "streams": [
+                            "Custom-DeviceTvmSnapshot_CL"
+                        ],
+                        "destinations": [
+                            "laDestination"
+                        ],
+                        "transformKql": "source",
+                        "outputStream": "Custom-DeviceTvmSnapshot_CL"
+                    }
+                ]
+            }
+        }
+    ]
+}

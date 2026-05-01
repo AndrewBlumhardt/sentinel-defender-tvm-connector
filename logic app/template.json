@@ -1,0 +1,241 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_QueryGraphAPI_name": {
+            "defaultValue": "QueryGraphAPI",
+            "type": "String"
+        },
+        "location": {
+            "defaultValue": "[resourceGroup().location]",
+            "type": "String"
+        },
+        "advancedHuntingUri": {
+            "defaultValue": "https://graph.microsoft.us/v1.0/security/runHuntingQuery",
+            "type": "String"
+        },
+        "advancedHuntingAudience": {
+            "defaultValue": "https://graph.microsoft.us",
+            "type": "String"
+        },
+        "logsIngestionUri": {
+            "type": "String"
+        },
+        "logsIngestionAudience": {
+            "defaultValue": "https://monitor.azure.us",
+            "type": "String"
+        },
+        "recurrenceInterval": {
+            "defaultValue": 3,
+            "type": "int"
+        },
+        "recurrenceFrequency": {
+            "defaultValue": "Day",
+            "type": "String"
+        },
+        "writeBatchSize": {
+            "defaultValue": 250,
+            "type": "int"
+        },
+        "parallelism": {
+            "defaultValue": 40,
+            "type": "int"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_QueryGraphAPI_name')]",
+            "location": "[parameters('location')]",
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "metadata": {
+                        "notes": {}
+                    },
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Recurrence": {
+                            "recurrence": {
+                                "interval": "[parameters('recurrenceInterval')]",
+                                "frequency": "[parameters('recurrenceFrequency')]"
+                            },
+                            "evaluatedRecurrence": {
+                                "interval": "[parameters('recurrenceInterval')]",
+                                "frequency": "[parameters('recurrenceFrequency')]"
+                            },
+                            "type": "Recurrence"
+                        }
+                    },
+                    "actions": {
+                        "HTTP-Count": {
+                            "runAfter": {
+                                "Initialize_Variables": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "uri": "[parameters('advancedHuntingUri')]",
+                                "method": "POST",
+                                "headers": {
+                                    "Content-Type": "application/json"
+                                },
+                                "body": {
+                                    "Query": "union withsource=TableName DeviceTvmInfoGathering, DeviceTvmInfoGatheringKB, DeviceTvmSoftwareEvidenceBeta, DeviceTvmCertificateInfo, DeviceTvmSecureConfigurationAssessment, DeviceTvmBrowserExtensions, DeviceTvmBrowserExtensionsKB, DeviceTvmHardwareFirmware, DeviceTvmSoftwareInventory, DeviceTvmSecureConfigurationAssessmentKB | count"
+                                },
+                                "authentication": {
+                                    "type": "ManagedServiceIdentity",
+                                    "audience": "[parameters('advancedHuntingAudience')]"
+                                }
+                            },
+                            "runtimeConfiguration": {
+                                "contentTransfer": {
+                                    "transferMode": "Chunked"
+                                }
+                            }
+                        },
+                        "Initialize_Variables": {
+                            "runAfter": {},
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "BatchSize",
+                                        "type": "integer",
+                                        "value": "[parameters('writeBatchSize')]"
+                                    },
+                                    {
+                                        "name": "TotalRows",
+                                        "type": "integer",
+                                        "value": 0
+                                    }
+                                ]
+                            }
+                        },
+                        "Set_TotalRows": {
+                            "runAfter": {
+                                "HTTP-Count": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "SetVariable",
+                            "inputs": {
+                                "name": "TotalRows",
+                                "value": "@int(outputs('HTTP-Count')?['body']?['results']?[0]?['Count'])"
+                            }
+                        },
+                        "For_each": {
+                            "foreach": "@outputs('Compose_-_Batch_Indexes')",
+                            "actions": {
+                                "QueryAdvancedHunting": {
+                                    "runAfter": {
+                                        "Compose_-_Current_Offset": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Http",
+                                    "inputs": {
+                                        "uri": "[parameters('advancedHuntingUri')]",
+                                        "method": "POST",
+                                        "headers": {
+                                            "Content-Type": "application/json"
+                                        },
+                                        "body": {
+                                            "Query": "@{concat(\n'union withsource=TableName DeviceTvmInfoGathering, DeviceTvmInfoGatheringKB, DeviceTvmSoftwareEvidenceBeta, DeviceTvmCertificateInfo, DeviceTvmSecureConfigurationAssessment, DeviceTvmBrowserExtensions, DeviceTvmBrowserExtensionsKB, DeviceTvmHardwareFirmware, DeviceTvmSoftwareInventory, DeviceTvmSecureConfigurationAssessmentKB ',\n'| sort by TableName asc ',\n'| serialize RowNumber = row_number() ',\n'| where RowNumber > ',\nstring(int(outputs('Compose_-_Current_Offset'))),\n' and RowNumber <= ',\nstring(add(int(outputs('Compose_-_Current_Offset')), int(variables('BatchSize')))),\n' | extend SnapshotDate = startofday(now())',\n' | extend SnapshotRunTime = now()',\n' | extend TimeGenerated = now()',\n' | project-rename TvmRecordType = Type'\n)}"
+                                        },
+                                        "authentication": {
+                                            "type": "ManagedServiceIdentity",
+                                            "audience": "[parameters('advancedHuntingAudience')]"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "HTTP_-_Write_TVM_Batch_to_Log_Analytics": {
+                                    "runAfter": {
+                                        "QueryAdvancedHunting": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Http",
+                                    "inputs": {
+                                        "uri": "[parameters('logsIngestionUri')]",
+                                        "method": "POST",
+                                        "headers": {
+                                            "Content-Type": "application/json"
+                                        },
+                                        "body": "@body('QueryAdvancedHunting')?['results']",
+                                        "authentication": {
+                                            "type": "ManagedServiceIdentity",
+                                            "audience": "[parameters('logsIngestionAudience')]"
+                                        }
+                                    },
+                                    "runtimeConfiguration": {
+                                        "contentTransfer": {
+                                            "transferMode": "Chunked"
+                                        }
+                                    }
+                                },
+                                "Compose_-_Current_Offset": {
+                                    "type": "Compose",
+                                    "inputs": "@mul(item(), variables('BatchSize'))"
+                                }
+                            },
+                            "runAfter": {
+                                "Compose_-_Batch_Indexes": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Foreach",
+                            "runtimeConfiguration": {
+                                "concurrency": {
+                                    "repetitions": "[parameters('parallelism')]"
+                                }
+                            }
+                        },
+                        "Compose_-_Batch_Count": {
+                            "runAfter": {
+                                "Set_TotalRows": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Compose",
+                            "inputs": "@div(add(variables('TotalRows'), sub(variables('BatchSize'), 1)), variables('BatchSize'))"
+                        },
+                        "Compose_-_Batch_Indexes": {
+                            "runAfter": {
+                                "Compose_-_Batch_Count": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Compose",
+                            "inputs": "@range(0, int(outputs('Compose_-_Batch_Count')))"
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {}
+                    }
+                }
+            }
+        }
+    ]
+}
