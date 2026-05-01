@@ -71,54 +71,212 @@ These were removed because they accounted for the majority of data volume while 
 |   `-- parameters.json
 `-- logic app/
     |-- template.json
-    `-- parameters.json
+    |-- parameters.json
+    |-- parameters.commercial.json
+    `-- parameters.gov.json
 ```
 
-## Deployment
+## Deploy To Azure (Portal Buttons)
 
-Deploy in this order:
+Deploy in this order: DCE -> DCR -> Logic App.
 
-1. DCE template
-2. DCR template
-3. Logic App template
+### Azure Commercial
 
-Example with Azure CLI:
+1. DCE
+
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json)
+
+2. DCR
+
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json)
+
+3. Logic App
+
+[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json)
+
+### Azure Government
+
+1. DCE
+
+[![Deploy to Azure Government](https://aka.ms/deploytoazuregovbutton)](https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdce%2Ftemplate.json)
+
+2. DCR
+
+[![Deploy to Azure Government](https://aka.ms/deploytoazuregovbutton)](https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Fdcr%2Ftemplate.json)
+
+3. Logic App
+
+[![Deploy to Azure Government](https://aka.ms/deploytoazuregovbutton)](https://portal.azure.us/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2FAndrewBlumhardt%2Fsentinel-defender-tvm-connector%2Fmain%2Flogic%2520app%2Ftemplate.json)
+
+## Step-by-Step Deployment (Recommended)
+
+The most reliable method is staged deployment with explicit parameter values and post-deploy validation.
+
+### 0. Prerequisites
+
+- Contributor (or higher) on target resource group.
+- Permission to assign RBAC on the DCR.
+- Permission to assign app roles in Microsoft Entra ID (admin consent path).
+- Existing Log Analytics workspace.
+- Azure CLI login to the correct cloud.
 
 ```bash
-# 1) Deploy DCE
+# Commercial
+az cloud set --name AzureCloud
+az login
+
+# Government
+az cloud set --name AzureUSGovernment
+az login
+```
+
+### 1. Set Variables
+
+```bash
+RG=<resource-group>
+LOCATION=<location>
+WORKSPACE_RESOURCE_ID=<workspace-resource-id>
+
+DCE_NAME=DeviceTvmSnapshot
+DCR_NAME=dcr-DeviceTvmSnapshot
+LOGICAPP_NAME=QueryGraphAPI
+```
+
+### 2. Deploy DCE
+
+```bash
 az deployment group create \
-  --resource-group <resource-group> \
+  --resource-group $RG \
   --template-file dce/template.json \
   --parameters @dce/parameters.json \
-  --parameters dataCollectionEndpoints_DeviceTvmSnapshot_name=<dce-name> location=<location>
+  --parameters dataCollectionEndpoints_DeviceTvmSnapshot_name=$DCE_NAME location=$LOCATION
 
-# 2) Deploy DCR
+DCE_ID=$(az monitor data-collection endpoint show -g $RG -n $DCE_NAME --query id -o tsv)
+```
+
+### 3. Deploy DCR
+
+```bash
 az deployment group create \
-  --resource-group <resource-group> \
+  --resource-group $RG \
   --template-file dcr/template.json \
   --parameters @dcr/parameters.json \
   --parameters \
-      dataCollectionRules_dcr_DeviceTvmSnapshot_name=<dcr-name> \
-      dataCollectionEndpoints_DeviceTvmSnapshot_externalid=<dce-resource-id> \
-      workspaceResourceId=<workspace-resource-id> \
-      location=<location>
+    dataCollectionRules_dcr_DeviceTvmSnapshot_name=$DCR_NAME \
+    dataCollectionEndpoints_DeviceTvmSnapshot_externalid=$DCE_ID \
+    workspaceResourceId=$WORKSPACE_RESOURCE_ID \
+    location=$LOCATION
 
-# 3) Deploy Logic App
-az deployment group create \
-  --resource-group <resource-group> \
-  --template-file "logic app/template.json" \
-  --parameters @"logic app/parameters.json" \
-  --parameters \
-      workflows_QueryGraphAPI_name=<logic-app-name> \
-      location=<location> \
-      logsIngestionUri=<logs-ingestion-uri>
+DCR_ID=$(az monitor data-collection rule show -g $RG -n $DCR_NAME --query id -o tsv)
 ```
 
-## Required Configuration
+### 4. Build Logs Ingestion URI (DCE + DCR Immutable ID)
 
-### 1. Azure Permissions (Ingestion)
+```bash
+DCR_IMMUTABLE_ID=$(az monitor data-collection rule show -g $RG -n $DCR_NAME --query immutableId -o tsv)
 
-Assign the Logic App managed identity:
+# Fallback for older CLI schemas:
+# DCR_IMMUTABLE_ID=$(az monitor data-collection rule show -g $RG -n $DCR_NAME --query properties.immutableId -o tsv)
+
+DCE_INGEST_ENDPOINT=$(az monitor data-collection endpoint show -g $RG -n $DCE_NAME --query logsIngestion.endpoint -o tsv)
+
+# Fallback for older CLI schemas:
+# DCE_INGEST_ENDPOINT=$(az monitor data-collection endpoint show -g $RG -n $DCE_NAME --query properties.logsIngestion.endpoint -o tsv)
+
+LOGS_INGEST_URI="${DCE_INGEST_ENDPOINT}dataCollectionRules/${DCR_IMMUTABLE_ID}/streams/Custom-DeviceTvmSnapshot_CL?api-version=2023-01-01"
+echo $LOGS_INGEST_URI
+```
+
+### 5. Deploy Logic App
+
+Use the cloud-specific sample parameters and pass the computed `logsIngestionUri`.
+
+```bash
+# Commercial
+az deployment group create \
+  --resource-group $RG \
+  --template-file "logic app/template.json" \
+  --parameters @"logic app/parameters.commercial.json" \
+  --parameters workflows_QueryGraphAPI_name=$LOGICAPP_NAME location=$LOCATION logsIngestionUri="$LOGS_INGEST_URI"
+
+# Government
+az deployment group create \
+  --resource-group $RG \
+  --template-file "logic app/template.json" \
+  --parameters @"logic app/parameters.gov.json" \
+  --parameters workflows_QueryGraphAPI_name=$LOGICAPP_NAME location=$LOCATION logsIngestionUri="$LOGS_INGEST_URI"
+```
+
+### 6. Assign Managed Identity Role on DCR (Ingestion)
+
+```bash
+LA_MI_PRINCIPAL_ID=$(az logic workflow show -g $RG -n $LOGICAPP_NAME --query identity.principalId -o tsv)
+
+az role assignment create \
+  --assignee-object-id $LA_MI_PRINCIPAL_ID \
+  --assignee-principal-type ServicePrincipal \
+  --role "Monitoring Metrics Publisher" \
+  --scope $DCR_ID
+```
+
+### 7. Assign Defender API App Role to Managed Identity
+
+This connector uses API permissions for Defender Advanced Hunting (not Azure RBAC). Assign one of:
+
+- `AdvancedQuery.Read.All`
+- `ThreatHunting.Read.All`
+
+Example (Microsoft Graph app role assignment flow):
+
+```bash
+# Service principal for Defender for Endpoint API (varies by tenant/cloud naming)
+MDE_RESOURCE_SP_ID=$(az ad sp list --display-name "WindowsDefenderATP" --query "[0].id" -o tsv)
+
+# Pick one role value: AdvancedQuery.Read.All or ThreatHunting.Read.All
+APP_ROLE_ID=$(az ad sp show --id $MDE_RESOURCE_SP_ID --query "appRoles[?value=='ThreatHunting.Read.All' && contains(allowedMemberTypes, 'Application')].id | [0]" -o tsv)
+
+az rest --method POST \
+  --url "https://graph.microsoft.com/v1.0/servicePrincipals/$LA_MI_PRINCIPAL_ID/appRoleAssignments" \
+  --headers "Content-Type=application/json" \
+  --body "{\"principalId\":\"$LA_MI_PRINCIPAL_ID\",\"resourceId\":\"$MDE_RESOURCE_SP_ID\",\"appRoleId\":\"$APP_ROLE_ID\"}"
+```
+
+Admin consent and directory permissions are required for this step.
+
+### 8. Update/Verify Ingestion URI in Logic App
+
+If DCR or DCE values change, redeploy Logic App with updated `logsIngestionUri` or update the HTTP action in designer.
+
+Expected format:
+
+```text
+{DCE_INGEST_ENDPOINT}dataCollectionRules/{DCR_IMMUTABLE_ID}/streams/Custom-DeviceTvmSnapshot_CL?api-version=2023-01-01
+```
+
+### 9. Test End-to-End
+
+1. Trigger the Logic App manually once from the portal (Run Trigger on `Recurrence`) for immediate validation.
+2. Confirm run status is Succeeded.
+3. Validate data landed in Log Analytics:
+
+```kusto
+DeviceTvmSnapshot_CL
+| summarize Rows=count(), Latest=max(TimeGenerated)
+```
+
+4. Validate table coverage:
+
+```kusto
+DeviceTvmSnapshot_CL
+| summarize Rows=count() by TableName
+| order by Rows desc
+```
+
+## Required Configuration Summary
+
+### Ingestion RBAC
+
+Assign Logic App managed identity to:
 
 ```text
 Monitoring Metrics Publisher
@@ -130,11 +288,9 @@ Scope:
 Data Collection Rule (DCR)
 ```
 
-### 2. Defender Advanced Hunting API Permissions
+### Defender Advanced Hunting API Permission
 
-This connector does not use Azure RBAC for Defender data access.
-
-You must assign API permissions (for example):
+Assign managed identity app role:
 
 ```text
 AdvancedQuery.Read.All
@@ -142,60 +298,27 @@ or
 ThreatHunting.Read.All
 ```
 
-to the Logic App managed identity service principal.
-
-This requires:
-
-- App role assignment
-- Admin consent
-
-### 3. Managed Identity API Permission (CLI/Graph)
-
-Assign API permissions to the managed identity using Microsoft Graph.
-
-High-level steps:
-
-1. Get the Logic App managed identity service principal ID
-2. Get the Microsoft Graph service principal ID
-3. Locate the app role ID for `AdvancedQuery.Read.All` or `ThreatHunting.Read.All`
-4. Assign the app role to the Logic App service principal
-5. Grant admin consent
-
-Placeholder:
-
-```text
-# Insert environment-specific CLI or Graph command here for assigning API permission to managed identity
-```
-
-### 4. Values to Update After Deployment
-
-You may need to update:
-
-```text
-DCE endpoint
-DCR immutable ID
-Stream name
-Custom table name
-Workspace ID
-Advanced Hunting endpoint
-Batch size
-Parallelism
-Schedule
-```
-
 ## Environment Endpoints
 
-Default template values target Azure Government:
+Azure Government defaults:
 
 - `advancedHuntingUri`: `https://graph.microsoft.us/v1.0/security/runHuntingQuery`
 - `advancedHuntingAudience`: `https://graph.microsoft.us`
 - `logsIngestionAudience`: `https://monitor.azure.us`
 
-For Azure commercial cloud, typically use:
+Azure Commercial defaults:
 
 - `advancedHuntingUri`: `https://graph.microsoft.com/v1.0/security/runHuntingQuery`
 - `advancedHuntingAudience`: `https://graph.microsoft.com`
 - `logsIngestionAudience`: `https://monitor.azure.com`
+
+## Recommended Methods (Research Notes)
+
+- Use staged IaC deployment (DCE -> DCR -> Logic App), not one giant template, for easier troubleshooting and safer retries.
+- Keep DCR and workspace in the same region.
+- Use least privilege RBAC (`Monitoring Metrics Publisher`) at DCR scope only.
+- Prefer managed identity and app role assignment for Defender API access.
+- Use DCR ingestion endpoint where possible; keep DCE path when private link or existing architecture requires it.
 
 ## Default Tuning
 

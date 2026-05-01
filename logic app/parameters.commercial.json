@@ -1,0 +1,36 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_QueryGraphAPI_name": {
+            "value": null
+        },
+        "location": {
+            "value": null
+        },
+        "advancedHuntingUri": {
+            "value": "https://graph.microsoft.com/v1.0/security/runHuntingQuery"
+        },
+        "advancedHuntingAudience": {
+            "value": "https://graph.microsoft.com"
+        },
+        "logsIngestionUri": {
+            "value": null
+        },
+        "logsIngestionAudience": {
+            "value": "https://monitor.azure.com"
+        },
+        "recurrenceInterval": {
+            "value": 3
+        },
+        "recurrenceFrequency": {
+            "value": "Day"
+        },
+        "writeBatchSize": {
+            "value": 250
+        },
+        "parallelism": {
+            "value": 40
+        }
+    }
+}
