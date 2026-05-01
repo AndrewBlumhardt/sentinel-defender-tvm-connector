@@ -124,6 +124,14 @@ DCE ARM ID (this is the value for dataCollectionEndpointId / dataCollectionEndpo
 /subscriptions/<subscription-id>/resourceGroups/<dce-rg>/providers/Microsoft.Insights/dataCollectionEndpoints/<dce-name>
 ```
 
+## Deployment Options
+
+This repo supports three deployment paths:
+
+1. Scripted deployment (recommended): one-command PowerShell flow via `Deploy-All.ps1` or `Deploy-All-Gov.ps1`.
+2. Portal button deployment: click-through ARM deployments for each component (`Table -> DCE -> DCR -> Logic App`).
+3. Manual CLI walkthrough: staged `az` commands with explicit variables and validation checks.
+
 ## Deploy with Script (Recommended)
 
 Clone the repo, then run a single PowerShell 7+ script that deploys **Table -> DCE -> DCR -> Logic App** in order, wires up the managed identity RBAC, and prints next-step instructions.
@@ -156,7 +164,7 @@ Deploy in this order: Table -> DCE -> DCR -> Logic App.
 > [!IMPORTANT]
 > If the subscription dropdown is empty in the deploy blade, you are usually signed into the wrong cloud or directory for that button. Use `portal.azure.com` for commercial and `portal.azure.us` for government, then switch to the correct directory/tenant and retry.
 
-## Step-by-Step Deployment (Recommended)
+## Manual CLI Walkthrough (Step-by-Step)
 
 The most reliable method is **staged deployment with explicit parameter values** and **post-deploy validation**.
 
