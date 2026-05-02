@@ -87,6 +87,9 @@ param(
     [string]$Subscription,
 
     [Parameter(Mandatory = $false)]
+    [int]$RbacAssignmentTimeoutSeconds = 90,
+
+    [Parameter(Mandatory = $false)]
     [switch]$Government
 )
 
@@ -360,20 +363,61 @@ if ([string]::IsNullOrWhiteSpace($miPrincipalId)) {
     $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Skipped (MI not found)' })
 }
 else {
-    az role assignment create `
+    $existingAssignmentCount = 0
+    $existingRaw = az role assignment list `
         --assignee-object-id $miPrincipalId `
-        --assignee-principal-type ServicePrincipal `
-        --role 'Monitoring Metrics Publisher' `
         --scope $dcrId `
-        --output none 2>$null
+        --role 'Monitoring Metrics Publisher' `
+        --query "length(@)" `
+        -o tsv 2>$null
 
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host '  Role assigned successfully.' -ForegroundColor Green
-        $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'OK' })
+    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($existingRaw)) {
+        [void][int]::TryParse($existingRaw, [ref]$existingAssignmentCount)
+    }
+
+    if ($existingAssignmentCount -ge 1) {
+        Write-Host '  Role already assigned.' -ForegroundColor Green
+        $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'OK (already assigned)' })
     }
     else {
-        Write-Host '  WARNING: Role assignment failed. Assign Monitoring Metrics Publisher on the DCR manually.' -ForegroundColor Yellow
-        $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Failed - assign manually' })
+        $stdoutPath = Join-Path $env:TEMP ("tvm-rbac-out-{0}.log" -f ([guid]::NewGuid()))
+        $stderrPath = Join-Path $env:TEMP ("tvm-rbac-err-{0}.log" -f ([guid]::NewGuid()))
+        try {
+            $rbacProcess = Start-Process -FilePath 'az' -ArgumentList @(
+                'role', 'assignment', 'create',
+                '--assignee-object-id', $miPrincipalId,
+                '--assignee-principal-type', 'ServicePrincipal',
+                '--role', 'Monitoring Metrics Publisher',
+                '--scope', $dcrId,
+                '--only-show-errors',
+                '--output', 'none'
+            ) -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+
+            $completed = $rbacProcess.WaitForExit($RbacAssignmentTimeoutSeconds * 1000)
+            if (-not $completed) {
+                try { $rbacProcess.Kill() } catch { }
+                Write-Host "  WARNING: RBAC assignment timed out after $RbacAssignmentTimeoutSeconds seconds. Assign Monitoring Metrics Publisher on the DCR manually." -ForegroundColor Yellow
+                $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Timed out - assign manually' })
+            }
+            elseif ($rbacProcess.ExitCode -eq 0) {
+                Write-Host '  Role assigned successfully.' -ForegroundColor Green
+                $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'OK' })
+            }
+            else {
+                $stderrText = if (Test-Path $stderrPath) { (Get-Content $stderrPath -Raw).Trim() } else { '' }
+                if ([string]::IsNullOrWhiteSpace($stderrText)) {
+                    Write-Host '  WARNING: Role assignment failed. Assign Monitoring Metrics Publisher on the DCR manually.' -ForegroundColor Yellow
+                }
+                else {
+                    Write-Host "  WARNING: Role assignment failed. $stderrText" -ForegroundColor Yellow
+                }
+                $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Failed - assign manually' })
+            }
+        }
+        finally {
+            if (Test-Path $stdoutPath) { Remove-Item $stdoutPath -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $stderrPath) { Remove-Item $stderrPath -Force -ErrorAction SilentlyContinue }
+        }
     }
 }
 
