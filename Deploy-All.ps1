@@ -48,6 +48,9 @@
 .PARAMETER Government
     Switch to target Azure Government (AzureUSGovernment cloud).
 
+.PARAMETER SkipRbacAssignment
+    Skips assigning Monitoring Metrics Publisher on the DCR.
+
 .EXAMPLE
     # Azure commercial
     .\Deploy-All.ps1 `
@@ -88,6 +91,9 @@ param(
 
     [Parameter(Mandatory = $false)]
     [int]$RbacAssignmentTimeoutSeconds = 90,
+
+    [Parameter(Mandatory = $false)]
+    [switch]$SkipRbacAssignment,
 
     [Parameter(Mandatory = $false)]
     [switch]$Government
@@ -354,69 +360,76 @@ if (-not $ok) { throw 'Logic App deployment failed. Aborting.' }
 
 # ---- 6. Assign Monitoring Metrics Publisher on DCR --------------------------------
 
-Write-Host "`n[RBAC] Assigning Monitoring Metrics Publisher on DCR..." -ForegroundColor Cyan
-$laJson        = az logic workflow show -g $ResourceGroup -n $LogicAppName -o json | ConvertFrom-Json
-$miPrincipalId = $laJson.identity.principalId
-
-if ([string]::IsNullOrWhiteSpace($miPrincipalId)) {
-    Write-Host '  WARNING: Could not retrieve Logic App managed identity. Assign Monitoring Metrics Publisher on the DCR manually.' -ForegroundColor Yellow
-    $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Skipped (MI not found)' })
+if ($SkipRbacAssignment) {
+    Write-Host "`n[RBAC] Skipping Monitoring Metrics Publisher assignment on DCR (requested)." -ForegroundColor Yellow
+    $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Skipped (requested)' })
+    $miPrincipalId = ''
 }
 else {
-    $existingAssignmentCount = 0
-    $existingRaw = az role assignment list `
-        --assignee-object-id $miPrincipalId `
-        --scope $dcrId `
-        --role 'Monitoring Metrics Publisher' `
-        --query "length(@)" `
-        -o tsv 2>$null
+    Write-Host "`n[RBAC] Assigning Monitoring Metrics Publisher on DCR..." -ForegroundColor Cyan
+    $laJson        = az logic workflow show -g $ResourceGroup -n $LogicAppName -o json | ConvertFrom-Json
+    $miPrincipalId = $laJson.identity.principalId
 
-    if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($existingRaw)) {
-        [void][int]::TryParse($existingRaw, [ref]$existingAssignmentCount)
-    }
-
-    if ($existingAssignmentCount -ge 1) {
-        Write-Host '  Role already assigned.' -ForegroundColor Green
-        $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'OK (already assigned)' })
+    if ([string]::IsNullOrWhiteSpace($miPrincipalId)) {
+        Write-Host '  WARNING: Could not retrieve Logic App managed identity. Assign Monitoring Metrics Publisher on the DCR manually.' -ForegroundColor Yellow
+        $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Skipped (MI not found)' })
     }
     else {
-        $stdoutPath = Join-Path $env:TEMP ("tvm-rbac-out-{0}.log" -f ([guid]::NewGuid()))
-        $stderrPath = Join-Path $env:TEMP ("tvm-rbac-err-{0}.log" -f ([guid]::NewGuid()))
-        try {
-            $rbacProcess = Start-Process -FilePath 'az' -ArgumentList @(
-                'role', 'assignment', 'create',
-                '--assignee-object-id', $miPrincipalId,
-                '--assignee-principal-type', 'ServicePrincipal',
-                '--role', 'Monitoring Metrics Publisher',
-                '--scope', $dcrId,
-                '--only-show-errors',
-                '--output', 'none'
-            ) -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+        $existingAssignmentCount = 0
+        $existingRaw = az role assignment list `
+            --assignee-object-id $miPrincipalId `
+            --scope $dcrId `
+            --role 'Monitoring Metrics Publisher' `
+            --query "length(@)" `
+            -o tsv 2>$null
 
-            $completed = $rbacProcess.WaitForExit($RbacAssignmentTimeoutSeconds * 1000)
-            if (-not $completed) {
-                try { $rbacProcess.Kill() } catch { }
-                Write-Host "  WARNING: RBAC assignment timed out after $RbacAssignmentTimeoutSeconds seconds. Assign Monitoring Metrics Publisher on the DCR manually." -ForegroundColor Yellow
-                $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Timed out - assign manually' })
-            }
-            elseif ($rbacProcess.ExitCode -eq 0) {
-                Write-Host '  Role assigned successfully.' -ForegroundColor Green
-                $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'OK' })
-            }
-            else {
-                $stderrText = if (Test-Path $stderrPath) { (Get-Content $stderrPath -Raw).Trim() } else { '' }
-                if ([string]::IsNullOrWhiteSpace($stderrText)) {
-                    Write-Host '  WARNING: Role assignment failed. Assign Monitoring Metrics Publisher on the DCR manually.' -ForegroundColor Yellow
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($existingRaw)) {
+            [void][int]::TryParse($existingRaw, [ref]$existingAssignmentCount)
+        }
+
+        if ($existingAssignmentCount -ge 1) {
+            Write-Host '  Role already assigned.' -ForegroundColor Green
+            $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'OK (already assigned)' })
+        }
+        else {
+            $stdoutPath = Join-Path $env:TEMP ("tvm-rbac-out-{0}.log" -f ([guid]::NewGuid()))
+            $stderrPath = Join-Path $env:TEMP ("tvm-rbac-err-{0}.log" -f ([guid]::NewGuid()))
+            try {
+                $rbacProcess = Start-Process -FilePath 'az' -ArgumentList @(
+                    'role', 'assignment', 'create',
+                    '--assignee-object-id', $miPrincipalId,
+                    '--assignee-principal-type', 'ServicePrincipal',
+                    '--role', 'Monitoring Metrics Publisher',
+                    '--scope', $dcrId,
+                    '--only-show-errors',
+                    '--output', 'none'
+                ) -NoNewWindow -PassThru -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+
+                $completed = $rbacProcess.WaitForExit($RbacAssignmentTimeoutSeconds * 1000)
+                if (-not $completed) {
+                    try { $rbacProcess.Kill() } catch { }
+                    Write-Host "  WARNING: RBAC assignment timed out after $RbacAssignmentTimeoutSeconds seconds. Assign Monitoring Metrics Publisher on the DCR manually." -ForegroundColor Yellow
+                    $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Timed out - assign manually' })
+                }
+                elseif ($rbacProcess.ExitCode -eq 0) {
+                    Write-Host '  Role assigned successfully.' -ForegroundColor Green
+                    $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'OK' })
                 }
                 else {
-                    Write-Host "  WARNING: Role assignment failed. $stderrText" -ForegroundColor Yellow
+                    $stderrText = if (Test-Path $stderrPath) { (Get-Content $stderrPath -Raw).Trim() } else { '' }
+                    if ([string]::IsNullOrWhiteSpace($stderrText)) {
+                        Write-Host '  WARNING: Role assignment failed. Assign Monitoring Metrics Publisher on the DCR manually.' -ForegroundColor Yellow
+                    }
+                    else {
+                        Write-Host "  WARNING: Role assignment failed. $stderrText" -ForegroundColor Yellow
+                    }
+                    $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Failed - assign manually' })
                 }
-                $results.Add([pscustomobject]@{ Step = 'RBAC: Monitoring Metrics Publisher'; Status = 'Failed - assign manually' })
             }
-        }
-        finally {
-            if (Test-Path $stdoutPath) { Remove-Item $stdoutPath -Force -ErrorAction SilentlyContinue }
-            if (Test-Path $stderrPath) { Remove-Item $stderrPath -Force -ErrorAction SilentlyContinue }
+            finally {
+                if (Test-Path $stdoutPath) { Remove-Item $stdoutPath -Force -ErrorAction SilentlyContinue }
+                if (Test-Path $stderrPath) { Remove-Item $stderrPath -Force -ErrorAction SilentlyContinue }
+            }
         }
     }
 }

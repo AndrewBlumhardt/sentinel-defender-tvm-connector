@@ -23,7 +23,8 @@ param(
     [Parameter(Mandatory = $false)] [string]$LogicAppName  = 'DeviceTvmSnapshotConnector',
     [Parameter(Mandatory = $false)] [string]$Location,
     [Parameter(Mandatory = $false)] [string]$Subscription,
-    [Parameter(Mandatory = $false)] [int]$RbacAssignmentTimeoutSeconds = 90
+    [Parameter(Mandatory = $false)] [int]$RbacAssignmentTimeoutSeconds = 90,
+    [Parameter(Mandatory = $false)] [switch]$SkipRbacAssignment
 )
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
