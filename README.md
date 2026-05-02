@@ -12,7 +12,7 @@ The goal is to enable:
 
 This is **not intended to be a fully scalable production connector**. It works best for **small to medium environments** or **targeted table exports**.
 
-For a full walkthrough and background, see the blog post: [Sentinel TVM Snapshot Data Connector](https://www.techchat.blog/2026/05/01/sentinel-tvm-snapshot-data-connector/)
+For a full walkthrough and background, see the blog post: <a href="https://www.techchat.blog/2026/05/01/sentinel-tvm-snapshot-data-connector/" target="_blank">Sentinel TVM Snapshot Data Connector</a>
 
 ## Architecture
 
