@@ -12,6 +12,8 @@ The goal is to enable:
 
 This is **not intended to be a fully scalable production connector**. It works best for **small to medium environments** or **targeted table exports**.
 
+For a full walkthrough and background, see the blog post: [Sentinel TVM Snapshot Data Connector](https://www.techchat.blog/2026/05/01/sentinel-tvm-snapshot-data-connector/)
+
 ## Architecture
 
 The workflow follows a simple pattern:
@@ -131,6 +133,10 @@ This repo supports three deployment paths:
 1. Scripted deployment (recommended): one-command PowerShell flow via `Deploy-All.ps1` or `Deploy-All-Gov.ps1`.
 2. Portal button deployment: click-through ARM deployments for each component (`Table -> DCE -> DCR -> Logic App`).
 3. Manual CLI walkthrough: staged `az` commands with explicit variables and validation checks.
+
+## Template Validation Gate
+
+Before accepting DCR template edits or replacing source template content with Azure exports, validate against [DCR-TEMPLATE-VALIDATION.md](DCR-TEMPLATE-VALIDATION.md).
 
 ## Deploy with Script (Recommended)
 
