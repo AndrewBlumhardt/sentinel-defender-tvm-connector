@@ -157,16 +157,6 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($enabledSubscriptions) 
     throw $tenantHint
 }
 
-# ---- Resolve location -----------------------------------------------------------
-
-if ([string]::IsNullOrWhiteSpace($Location)) {
-    $Location = az group show --name $ResourceGroup --query location -o tsv 2>$null
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Location)) {
-        throw "Resource group '$ResourceGroup' not found in subscription $($account.id)."
-    }
-    Write-Host "Location not specified; using resource group location: $Location" -ForegroundColor DarkCyan
-}
-
 $workspaceMatch = [regex]::Match(
     $WorkspaceResourceId,
     '^/subscriptions/[^/]+/resourceGroups/([^/]+)/providers/Microsoft\.OperationalInsights/workspaces/([^/]+)$',
@@ -179,6 +169,42 @@ if (-not $workspaceMatch.Success) {
 
 $workspaceRg   = $workspaceMatch.Groups[1].Value
 $workspaceName = $workspaceMatch.Groups[2].Value
+
+# ---- Resolve/create deployment resource group and location ----------------------
+
+$resourceGroupExists = az group exists --name $ResourceGroup 2>$null
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($resourceGroupExists)) {
+    throw "Unable to determine whether resource group '$ResourceGroup' exists in subscription $($account.id)."
+}
+
+if ([string]::IsNullOrWhiteSpace($Location)) {
+    if ($resourceGroupExists -eq 'true') {
+        $Location = az group show --name $ResourceGroup --query location -o tsv 2>$null
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Location)) {
+            throw "Resource group '$ResourceGroup' exists but location could not be resolved."
+        }
+        Write-Host "Location not specified; using resource group location: $Location" -ForegroundColor DarkCyan
+    }
+    else {
+        $Location = az monitor log-analytics workspace show --ids $WorkspaceResourceId --query location -o tsv 2>$null
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($Location)) {
+            throw "Resource group '$ResourceGroup' not found, and workspace location could not be resolved from '$WorkspaceResourceId'."
+        }
+        Write-Host "Resource group '$ResourceGroup' not found. Creating it in workspace location: $Location" -ForegroundColor Yellow
+        az group create --name $ResourceGroup --location $Location --output none
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to create resource group '$ResourceGroup' in location '$Location'."
+        }
+        $resourceGroupExists = 'true'
+    }
+}
+elseif ($resourceGroupExists -ne 'true') {
+    Write-Host "Resource group '$ResourceGroup' not found. Creating it in specified location: $Location" -ForegroundColor Yellow
+    az group create --name $ResourceGroup --location $Location --output none
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to create resource group '$ResourceGroup' in location '$Location'."
+    }
+}
 
 $timestamp = Get-Date -Format 'yyyyMMddHHmmss'
 $results   = [System.Collections.Generic.List[pscustomobject]]::new()
