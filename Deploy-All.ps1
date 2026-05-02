@@ -369,7 +369,7 @@ $updateLogicAppCommand = @(
     "  --resource-group $ResourceGroup",
     '  --template-file "logic app/template.json"',
     (if ($Government) { '  --parameters @"logic app/parameters.gov.json"' } else { '  --parameters @"logic app/parameters.commercial.json"' }),
-    "  --parameters workflows_QueryGraphAPI_name=$LogicAppName location=$Location logsIngestionUri=\"$logsIngestionUri\""
+    "  --parameters workflows_QueryGraphAPI_name=$LogicAppName location=$Location logsIngestionUri='$logsIngestionUri'"
 ) -join "`n"
 
 $defenderCliCommands = @(
