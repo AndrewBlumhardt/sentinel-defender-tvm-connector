@@ -374,11 +374,11 @@ $updateLogicAppCommand = @(
 
 $defenderCliCommands = @(
     "$([Environment]::NewLine)# Resolve the Defender for Endpoint Enterprise application object",
-    "MDE_RESOURCE_SP_ID=`$(az ad sp list --display-name \"$defenderSpName\" --query \"[0].id\" -o tsv)",
+    ('MDE_RESOURCE_SP_ID=`$(az ad sp list --display-name "{0}" --query "[0].id" -o tsv)' -f $defenderSpName),
     "$([Environment]::NewLine)# Resolve the Threat Hunting app role ID",
-    "APP_ROLE_ID=`$(az ad sp show --id `$MDE_RESOURCE_SP_ID --query \"appRoles[?value=='$defenderAppRole' && contains(allowedMemberTypes, 'Application')].id | [0]\" -o tsv)",
+    ('APP_ROLE_ID=`$(az ad sp show --id `$MDE_RESOURCE_SP_ID --query "appRoles[?value==''{0}'' && contains(allowedMemberTypes, ''Application'')].id | [0]" -o tsv)' -f $defenderAppRole),
     "$([Environment]::NewLine)# Assign the app role to the Logic App managed identity",
-    "az rest --method POST --url \"$graphApiBase/v1.0/servicePrincipals/$miPrincipalId/appRoleAssignments\" --headers \"Content-Type=application/json\" --body '{\"principalId\":\"$miPrincipalId\",\"resourceId\":\"'\"`$MDE_RESOURCE_SP_ID\"'\",\"appRoleId\":\"'\"`$APP_ROLE_ID\"'\"}'"
+    ('az rest --method POST --url "{0}/v1.0/servicePrincipals/{1}/appRoleAssignments" --headers "Content-Type=application/json" --body ''{{"principalId":"{1}","resourceId":"''"`$MDE_RESOURCE_SP_ID"''","appRoleId":"''"`$APP_ROLE_ID"''"}}''' -f $graphApiBase, $miPrincipalId)
 ) -join "`n"
 
 Write-Host @"
