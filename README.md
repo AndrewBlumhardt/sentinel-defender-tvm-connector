@@ -14,6 +14,12 @@ This is **not intended to be a fully scalable production connector**. It works b
 
 For a full walkthrough and background, see the blog post: <a href="https://www.techchat.blog/2026/05/01/sentinel-tvm-snapshot-data-connector/" target="_blank">Sentinel TVM Snapshot Data Connector</a>
 
+<p align="center">
+  <a href="images/logic-app-flow.png" target="_blank">
+    <img src="images/logic-app-flow.png" alt="Defender TVM Snapshot Logic App flow" width="60%" />
+  </a>
+</p>
+
 ## Architecture
 
 The workflow follows a simple pattern:
