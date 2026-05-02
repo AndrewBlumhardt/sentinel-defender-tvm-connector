@@ -389,7 +389,7 @@
                         "destinations": [
                             "laDestination"
                         ],
-                        "transformKql": "source | extend TenantId = tostring(TenantId)",
+                        "transformKql": "source",
                         "outputStream": "Custom-DeviceTvmSnapshot_CL"
                     }
                 ]
